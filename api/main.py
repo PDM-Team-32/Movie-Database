@@ -4,10 +4,21 @@ import os
 from sshtunnel import SSHTunnelForwarder
 import dotenv
 
+cliCommands = {
+    "CREATE_ACCOUNT": "Create your new account", 
+    "LOGIN <Username> <Password>": "Login to your account",
+    "CREATE_COLLECTION <Collection name>" : "Create a new (empty) Movie Collection"}
+
 def main():
     dotenv.load_dotenv("./credentials.env")
-    accessDBExample()
+    cliMenu()
+    # accessDBExample()
     
+    
+def cliMenu():
+    print("*** COMMAND LINE INTERFACE MENU ***")
+    for key in cliCommands:
+        print(key + ": " + cliCommands[key])
     
     
 def accessDBExample():
