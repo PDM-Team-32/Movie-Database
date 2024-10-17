@@ -47,23 +47,29 @@ CREATE TABLE UserMovieCollection(
 );
 
 CREATE TABLE MovieGenre(
-    MovieId INT PRIMARY KEY,
-    GenreId INT PRIMARY KEY,
+    MovieId INT NOT NULL,
+    GenreId INT NOT NULL,
+    CONSTRAINT "MovieGenre_PK"
+        PRIMARY KEY (MovieId, GenreId),
     FOREIGN KEY (GenreId) REFERENCES Genre(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id)
 );
 
 CREATE TABLE MoviePlatform(
-    MovieId INT PRIMARY KEY,
-    PlatformID INT PRIMARY KEY,
+    MovieId INT NOT NULL,
+    PlatformID INT NOT NULL,
+    CONSTRAINT "MoviePlatform_PK"
+        PRIMARY KEY (MovieId, PlatformID),
     FOREIGN KEY (PlatformID) REFERENCES ReleasePlatform(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id),
     ReleaseDate DATE NOT NULL
 );
 
 CREATE TABLE UserWatchesMovie(
-    MovieId INT PRIMARY KEY,
-    UserId INT PRIMARY KEY,
+    MovieId INT NOT NULL,
+    UserId INT NOT NULL,
+    CONSTRAINT "UserWatchesMovie_PK"
+        PRIMARY KEY (MovieId, UserId),
     FOREIGN KEY (UserId) REFERENCES Users(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id),
     StartTime TIMESTAMP NOT NULL,
@@ -71,44 +77,57 @@ CREATE TABLE UserWatchesMovie(
 );
 
 CREATE TABLE UserRatesMovie(
-    MovieId INT PRIMARY KEY,
-    UserId INT PRIMARY KEY,
+    MovieId INT NOT NULL,
+    UserId INT NOT NULL,
+    CONSTRAINT "UserRatesMovie_pk"
+        PRIMARY KEY (MovieId, UserId),
     FOREIGN KEY (UserId) REFERENCES Users(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id),
     StarRating INT NOT NULL
 );
 
 CREATE TABLE MovieCollection(
-    MovieId INT PRIMARY KEY,
-    CollectionId INT PRIMARY KEY,
+    MovieId INT NOT NULL,
+    CollectionId INT NOT NULL,
+    CONSTRAINT "MovieCollection_pk"
+        PRIMARY KEY (MovieId, CollectionId),
     FOREIGN KEY (CollectionId) REFERENCES UserMovieCollection(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id)
 );
 
 CREATE TABLE UserFollowingUser(
-    FollowedUserId INT PRIMARY KEY,
-    FollowingUserId INT PRIMARY KEY,
+    FollowedUserId INT NOT NULL,
+    FollowingUserId INT NOT NULL,
+    CONSTRAINT "UserFollowingUser_pk"
+        PRIMARY KEY (FollowedUserId, FollowingUserId),
+    CONSTRAINT CU1 CHECK(FollowedUserId != FollowingUserId),
     FOREIGN KEY (FollowedUserId) REFERENCES Users(id),
     FOREIGN KEY (FollowingUserId) REFERENCES Users(id)
 );
 
 CREATE TABLE CastDirects(
-    CastId INT PRIMARY KEY,
-    MovieId INT PRIMARY KEY,
+    CastId INT NOT NULL,
+    MovieId INT NOT NULL,
+    CONSTRAINT "CastDirects_pk"
+        PRIMARY KEY (CastId, MovieId),
     FOREIGN KEY (CastId) REFERENCES CastMember(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id)
 );
 
 CREATE TABLE CastActs(
-    CastId INT PRIMARY KEY,
-    MovieId INT PRIMARY KEY,
+    CastId  INT NOT NULL,
+    MovieId INT NOT NULL,
+    CONSTRAINT "CastActs_pk"
+        PRIMARY KEY (CastId, MovieId),
     FOREIGN KEY (CastId) REFERENCES CastMember(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id)
 );
 
 CREATE TABLE MovieStudio(
-    StudioId INT PRIMARY KEY,
-    MovieId INT PRIMARY KEY,
+    StudioId INT NOT NULL,
+    MovieId INT NOT NULL,
+    CONSTRAINT "MovieStudio_pk"
+        PRIMARY KEY (StudioId, MovieId),
     FOREIGN KEY (StudioId) REFERENCES Studio(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id)
 );
