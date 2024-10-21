@@ -21,7 +21,7 @@ def viewCollections(conn):
     sql = """SELECT
                 umc.name,
                 COUNT(m.title),
-                SUM(m.length)
+                TO_CHAR(SUM(length)*'1 minute'::interval, 'HH24:MI')
             FROM movieCollection AS mc
             INNER JOIN userMovieCollection AS umc
             ON (umc.id = mc.collectionid)
@@ -34,7 +34,6 @@ def viewCollections(conn):
             GROUP BY umc.name;"""
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
-    
 
 
 def createMovieCollection(conn):
