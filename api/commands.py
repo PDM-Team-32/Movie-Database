@@ -1,8 +1,5 @@
-import os
-import psycopg2
-from sshtunnel import SSHTunnelForwarder
-import dotenv
 import utils
+from tabulate import tabulate
 
 
 def createAccount(conn):
@@ -17,6 +14,27 @@ def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
     for key in cliCommands:
         print(key + ": " + cliCommands[key]["helpText"])
+
+
+def viewCollections(conn):
+    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    sql = """SELECT
+                umc.name,
+                COUNT(m.title),
+                SUM(m.length)
+            FROM movieCollection AS mc
+            INNER JOIN userMovieCollection AS umc
+            ON (umc.id = mc.collectionid)
+            INNER JOIN movie AS m
+            ON (m.id = mc.movieid)
+            WHERE mc.collectionId IN (
+                                    SELECT id
+                                    FROM userMovieCollection
+                                    WHERE userId = 1)
+            GROUP BY umc.name;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
+    
 
 
 def createMovieCollection(conn):
@@ -48,6 +66,12 @@ cliCommands = {
     {
         "helpText": "Create a new (empty) Movie Collection",
         "actionFunction": createMovieCollection,
+        "isDbAccessCommand": True
+    },
+    "VIEW_COLLECTION" :
+    {
+        "helpText": "Look at your collections and see their stats",
+        "actionFunction": viewCollections,
         "isDbAccessCommand": True
     },
     "HELP":
