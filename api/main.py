@@ -5,35 +5,6 @@ from sshtunnel import SSHTunnelForwarder
 import dotenv
 import commands
 
-# cliCommands = {
-#     "CREATE_ACCOUNT": 
-#     {
-#         "helpText": "Create your new account",
-#         "actionFunction": commands.createAccount
-#     }, 
-#     "LOGIN":
-#     {
-#         "helpText": "Login to your account",
-#         "actionFunction": commands.login
-#     },
-#     "CREATE_COLLECTION" :
-#     {
-#         "helpText": "Create a new (empty) Movie Collection",
-#         "actionFunction": commands.login
-#     },
-#     "HELP":
-#     {
-#         "helpText": "Print this menu again",
-#         "actionFunction": commands.help
-#     },
-#     "QUIT": 
-#     {
-#         "helpText": "Exit this application",
-#         "actionFunction": commands.quit
-#     }
-# }
-
-
 def main():
     dotenv.load_dotenv("./credentials.env")
     commands.help()
@@ -49,9 +20,7 @@ def main():
 def getUserInput():
     return(input('Please enter a command: '))
 
-def stripInputs(input):
-    return(input.split(" ", 1)[0])
- 
+
 def accessDBExample():
     try:
         with SSHTunnelForwarder(('starbug.cs.rit.edu', 22),
@@ -76,6 +45,7 @@ def accessDBExample():
                 conn.close()
     except:
          print("Connection Failed")
+
 
 if __name__ == "__main__":
     main()
