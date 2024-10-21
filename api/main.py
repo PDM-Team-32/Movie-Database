@@ -16,7 +16,9 @@ def main():
             if(commands.cliCommands[x]["isDbAccessCommand"]):
                 # Wrap the command in the access DB stuff so we dont have to write it every time
                 accessDbWithCommand(commands.cliCommands[x]["actionFunction"])
-    # accessDBExample()
+            else:
+                # Since we are not accessing the DB we can just do the thing (this is mostly only for the help function right now)
+                 commands.cliCommands[x]["actionFunction"]()
     
     
 def getUserInput():
@@ -40,9 +42,10 @@ def accessDbWithCommand(command):
                 }
                 conn = psycopg2.connect(**params)
                 print("Database connection established")
-
+                # Everything above is just some database connection magic here we actually execute the command
+                # All functions which access the DB will accept the conn value as a param.
+                # Normally I would opt for a cleaner solution but because we cannot return from this function without breaking the connection this is what Ive got.
                 command(conn)
-
     except:
          print("Connection Failed")
 
