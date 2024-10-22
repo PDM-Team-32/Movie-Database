@@ -1,10 +1,68 @@
 import utils
 from tabulate import tabulate
+import datetime
+import re
 
-
+# TODO char limits on everything?
 def createAccount(conn):
-    print("Account Creation")
+    print("Account Creation:")
 
+    ########## collect user info from cmd line ########## 
+    username = input("\tProvide a Username: ")
+    
+    # email checking 
+    email = input("\tProvide an email address: ")
+    while (not re.match(r"^\S+@\S+\.\S+$", email)):
+        print("***" + email + " is not a valid email address ***")
+        email = input("\tProvide a valid email address: ")
+    
+    # password checking
+    # length [8, 64]
+    # contains a lowercase letter
+    # contains a capital letter
+    # contains a number
+    # contains a symbol
+    # does not contain a space
+    # TODO hash in phase 3
+    passwordHelp()
+    password = str(input("\tProvide a Password: "))
+    while (not (
+            (len(password) >= 8) and (len(password) <= 64) and 
+            re.search("[a-z]", password) and
+            re.search("[A-Z]", password) and
+            re.search("[!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?]", password) and
+            (not re.search(" ", password)))):
+        print("*** That was not a valid password ***")
+        passwordHelp()
+        password = str(input("\tProvide a Password: "))
+
+    # TODO TODO TODO TODO TODO TODO REMOVE LATER (does python have ifdefs or an equivalent (i miss compiled langauges))
+    password = "123456"
+
+    fName = input("\tProvide a First Name: ")
+    lName = input("\tProvide a Last Name: ")
+
+    ########## get info from system ##########
+    current_datetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+
+    ########## insert the user ##########
+    sql = """INSERT INTO users 
+            (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
+            VALUES(%s, %s, %s, %s, %s, %s, %s)"""
+    utils.exec_commit(conn, sql, (fName, lName, email, username, password, current_datetime, current_datetime))
+
+    # TODO name of service?
+    print("Welcome to NAME, please use the LOGIN command to access your account")
+
+def passwordHelp():
+    print("**************** Password Requirements ****************")
+    print("8 to 64 characters long")
+    print("contain a lowercase letter")
+    print("contain a capital letter")
+    print("contain a number")
+    print("contain a symbol (!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?)")
+    print("contain no spaces")
+    print("******************************************************")
 
 def login(conn):
     print("Login")
