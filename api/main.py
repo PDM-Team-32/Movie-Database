@@ -3,24 +3,24 @@ import psycopg2
 import os
 from sshtunnel import SSHTunnelForwarder
 import dotenv
-
-cliCommands = {
-    "CREATE_ACCOUNT": "Create your new account", 
-    "LOGIN <Username> <Password>": "Login to your account",
-    "CREATE_COLLECTION <Collection name>" : "Create a new (empty) Movie Collection"}
+import commands
 
 def main():
     dotenv.load_dotenv("./credentials.env")
-    cliMenu()
+    commands.help()
+    # Set x to the user input and ensure it does not ask us to quit
+    while (x := getUserInput()) != "QUIT":
+        if(x not in commands.cliCommands.keys()):
+            print("Please enter a valid input")
+        else:
+            commands.cliCommands[x]["actionFunction"]()
     # accessDBExample()
     
     
-def cliMenu():
-    print("*** COMMAND LINE INTERFACE MENU ***")
-    for key in cliCommands:
-        print(key + ": " + cliCommands[key])
-    
-    
+def getUserInput():
+    return(input('Please enter a command: '))
+
+
 def accessDBExample():
     try:
         with SSHTunnelForwarder(('starbug.cs.rit.edu', 22),
@@ -45,6 +45,7 @@ def accessDBExample():
                 conn.close()
     except:
          print("Connection Failed")
+
 
 if __name__ == "__main__":
     main()
