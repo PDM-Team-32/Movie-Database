@@ -36,23 +36,18 @@ def createAccount(conn):
         passwordHelp()
         password = str(input("\tProvide a Password: "))
 
-    # TODO TODO TODO TODO TODO TODO REMOVE LATER (does python have ifdefs or an equivalent (i miss compiled langauges))
-    password = "123456"
-
     fName = input("\tProvide a First Name: ")
     lName = input("\tProvide a Last Name: ")
 
     ########## get info from system ##########
-    current_datetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
     ########## insert the user ##########
     sql = """INSERT INTO users 
             (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
             VALUES(%s, %s, %s, %s, %s, %s, %s)"""
-    utils.exec_commit(conn, sql, (fName, lName, email, username, password, current_datetime, current_datetime))
-
-    # TODO name of service?
-    print("Welcome to NAME, please use the LOGIN command to access your account")
+    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime))
+    print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
 def passwordHelp():
     print("**************** Password Requirements ****************")
@@ -62,10 +57,67 @@ def passwordHelp():
     print("contain a number")
     print("contain a symbol (!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?)")
     print("contain no spaces")
-    print("******************************************************")
+    print("*******************************************************")
 
+
+# TODO store current user id (id can be -1 if no ones logged in)
 def login(conn):
-    print("Login")
+    # general idea, ask for user, ask for password and if theres a match then login
+    # else, loop until correct password (attempt limit?), ctrl e to exit?
+    
+    ########## Queries ##########
+    userQuery = "SELECT username FROM users"
+    idPasswordQuery = "SELECT id, password FROM users where username = %s"
+    
+    print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
+
+    ########## Username ##########
+    validUser = False
+    while (not validUser):
+        # grab user name
+        username = input("\tEnter your username: ")
+
+        # get the users (hard to read)
+        allUsers = utils.exec_get_all(conn, userQuery)
+
+        # make the user list easy to read
+        i = 0
+        allUsersList = []
+        for user in allUsers:
+            allUsersList.append(user[0])
+            i += 1
+
+        # for debugging
+        #print(allUsersList)
+        #print(username)
+
+        # check user
+        if (username in allUsersList):
+            validUser = True
+        else:
+            print("*** Not a valid username ***\n*** Note: To login, you must first create an account ***")
+
+    ##### Password #####
+    packedIdPassword = utils.exec_get_all(conn, idPasswordQuery, (username,))
+    id = packedIdPassword[0][0]
+    expectedPassword = packedIdPassword[0][1]
+
+    # for debugging, uncomment if you want to feel like a hacker
+    #print("\texpected password: " + expectedPassword) 
+    
+    password = ""
+    while (not (password == expectedPassword)):
+        password = input("\tEnter your password: ")
+        if (password == "exit"): # note: exit is not a valid password (see createAccount())
+            return 0
+    
+    ###### Update lastaccessdate ######
+    datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    utils.exec_commit(conn, datePrompt, (currentDatetime, id))
+    
+    print("Welcome back " + username)
+        
 
 
 def help():
