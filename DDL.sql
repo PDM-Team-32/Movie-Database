@@ -4,7 +4,7 @@ CREATE TABLE Users(
     LastName VARCHAR(32) NOT NULL,
     Email VARCHAR(320) NOT NULL,
     UserName VARCHAR(32) NOT NULL,
-    Password INT NOT NULL,
+    Password VARCHAR(64) NOT NULL,
     CreationDate DATE NOT NULL,
     LastAccessDate DATE NOT NULL
 );
