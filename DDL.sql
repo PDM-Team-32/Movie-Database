@@ -43,7 +43,7 @@ CREATE TABLE UserMovieCollection(
     id SERIAL PRIMARY KEY,
     UserId INT NOT NULL,
     FOREIGN KEY (UserId)   REFERENCES Users(id),
-    Name VARCHAR(30) DEFAULT 'My Collection'
+    Name VARCHAR(128) DEFAULT 'My Collection'
 );
 
 CREATE TABLE MovieGenre(
