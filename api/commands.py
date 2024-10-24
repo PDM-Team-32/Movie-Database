@@ -28,10 +28,10 @@ def createAccount(conn):
     password = str(input("\tProvide a Password: "))
     while (not (
             (len(password) >= 8) and (len(password) <= 64) and 
-            re.search("[a-z]", password) and
-            re.search("[A-Z]", password) and
-            re.search("[!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?]", password) and
-            (not re.search(" ", password)))):
+            bool(re.search("[a-z]", password)) and
+            bool(re.search("[A-Z]", password)) and
+            bool(re.search("[!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?]", password)) and
+            bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
@@ -49,15 +49,6 @@ def createAccount(conn):
     utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime))
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
-def passwordHelp():
-    print("**************** Password Requirements ****************")
-    print("8 to 64 characters long")
-    print("contain a lowercase letter")
-    print("contain a capital letter")
-    print("contain a number")
-    print("contain a symbol (!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?)")
-    print("contain no spaces")
-    print("*******************************************************")
 
 
 # TODO store current user id (id can be -1 if no ones logged in)
@@ -196,3 +187,13 @@ cliCommands = {
         "isDbAccessCommand": False
     }
 }
+
+def passwordHelp():
+    print("**************** Password Requirements ****************")
+    print("8 to 64 characters long")
+    print("contain a lowercase letter")
+    print("contain a capital letter")
+    print("contain a number")
+    print("contain a symbol (!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?)")
+    print("contain no spaces")
+    print("*******************************************************")
