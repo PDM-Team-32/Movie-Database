@@ -9,7 +9,7 @@ import re
 def createAccount(conn):
     print("Account Creation:")
 
-    ########## collect user info from cmd line ########## 
+    ###### Get an unused username ######
     while (True):
         username = input("\tProvide a Username: ")
         userCheckQuery = "SELECT username FROM users WHERE username = %s"
@@ -19,25 +19,15 @@ def createAccount(conn):
             continue
         else:
             break
-
     
-    # email checking 
+    ###### Get an email address ######
     email = input("\tProvide an email address: ")
     while (not re.match(r"^\S+@\S+\.\S+$", email)):
         print("***" + email + " is not a valid email address ***")
         email = input("\tProvide a valid email address: ")
     
-
-    """
-    password checking
-    length [8, 64]
-    contains a lowercase letter
-    contains a capital letter
-    contains a number
-    contains a symbol
-    does not contain a space
-    TODO hash in phase 3    
-    """
+    ###### Get a valid password (see regex or passwordHelp) ######
+    # TODO hash in phase 3    
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
@@ -50,13 +40,12 @@ def createAccount(conn):
         passwordHelp()
         password = str(input("\tProvide a Password: "))
 
+    ###### Get remaining info (we don't really care abt this stuff) ######
     fName = input("\tProvide a First Name: ")
     lName = input("\tProvide a Last Name: ")
-
-    ########## get info from system ##########
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
-    ########## insert the user ##########
+    ###### Insert the user into the DB ######
     sql = """INSERT INTO users 
             (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
             VALUES(%s, %s, %s, %s, %s, %s, %s)"""
@@ -65,37 +54,24 @@ def createAccount(conn):
 
 
 def login(conn):
-    ########## Queries ##########
-    #userQuery = "SELECT username FROM users"
     idPasswordQuery = "SELECT id, password FROM users where username = %s"
+    id = ""
+    expectedPassword = ""
 
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
-    ########## Username ##########
+    ###### Ensure the account exists ######
     while (True):
-        # grab user name
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
             return
         
         packedIdPassword = utils.exec_get_all(conn, idPasswordQuery, (username,))
-        id = packedIdPassword[0][0]
-        expectedPassword = packedIdPassword[0][1]
+        if (packedIdPassword): # unpack if we got a user
+            id = packedIdPassword[0][0]
+            expectedPassword = packedIdPassword[0][1]
 
-        # get the users (hard to read)
-        #allUsers = utils.exec_get_all(conn, userQuery)
-
-        # make the user list easy to read
-        # i = 0
-        # allUsersList = []
-        # for user in allUsers:
-        #     allUsersList.append(user[0])
-        #     i += 1
-
-        # for debugging
-        # print(username)
-
-        # check user
+        # Check user existing
         if (id):
             break
         else:
@@ -103,7 +79,7 @@ def login(conn):
             continue
 
     # for debugging, uncomment if you want to feel like a hacker
-    #print("\texpected password: " + expectedPassword) 
+    # print("\texpected password: " + expectedPassword) 
     
     password = ""
     while (not (password == expectedPassword)):
@@ -116,8 +92,9 @@ def login(conn):
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
     utils.exec_commit(conn, datePrompt, (currentDatetime, id))
     
+    ###### User is now logged in ######
     print("Welcome back " + username)
-    utils.sessionToken = int(id)
+    utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
 # TODO this needs to become a connected function to store sessionToken in DB
 def logout():
@@ -127,10 +104,9 @@ def logout():
     else:
         print("*** You need to LOGIN before you can LOGOUT ***")
 
-"""
-Idea here is a user will search for another user, and follow, unfollow, 
-or see their movie collections or who their following etc (whatever we want)
-"""
+
+# Idea here is a user will search for another user, and take respective following action
+# We can also see others collections here, if we want to
 def userSearch(conn):
     searchedUsername = input("\tPlease input a username to search: ")
 
@@ -176,7 +152,7 @@ def userSearch(conn):
             pass
     else:
         print("\tSorry, " + searchedUsername + "is not a member of MovieDB")
-
+        
 
 def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
@@ -266,6 +242,13 @@ cliCommands = {
     }
 }
 
+## Password helper 
+# length [8, 64]
+# contains a lowercase letter
+# contains a capital letter
+# contains a number
+# contains a symbol
+# does not contain a space
 def passwordHelp():
     print("**************** Password Requirements ****************")
     print("8 to 64 characters long")
