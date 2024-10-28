@@ -111,9 +111,13 @@ def login(conn):
     print("Welcome back " + username)
     utils.sessionToken = int(id)
         
+# TODO this needs to become a connected function to store sessionToken in DB
 def logout():
-    print("*** You have logged out. Use LOGIN to login again ***")
-    utils.sessionToken = -1
+    if (utils.sessionToken > 0):
+        utils.sessionToken = -1
+        print("*** You have logged out. Use LOGIN to login again ***")
+    else:
+        print("*** You need to LOGIN before you can LOGOUT ***")
 
 """
 Idea here is a user will search for another user, and follow, unfollow, 
@@ -156,11 +160,9 @@ def userSearch(conn):
             if (followingId): # here we want to unfollow
                 actionSQL = """DELETE FROM userfollowinguser WHERE 
                             followeduserid = %s and followinguserid = %s"""
-                pass
             else: # here we want to follow
                 actionSQL = """INSERT INTO userfollowinguser 
                             (followeduserid, followinguserid) VALUES (%s, %s)"""
-                pass
             utils.exec_commit(conn, actionSQL, (searchedUserId, utils.sessionToken))
         else:
             pass
