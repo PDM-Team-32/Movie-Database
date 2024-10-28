@@ -4,7 +4,8 @@ import datetime
 import re
 
 
-# TODO char limits on everything?
+# TODO char limits on everything
+# TODO attempt limit on while true loops
 def createAccount(conn):
     print("Account Creation:")
 
@@ -12,7 +13,7 @@ def createAccount(conn):
     while (True):
         username = input("\tProvide a Username: ")
         userCheckQuery = "SELECT username FROM users WHERE username = %s"
-        results = utils.exec_get_one(conn, userCheckQuery, (username,))[0]
+        results = utils.exec_get_one(conn, userCheckQuery, (username,))
         if (results):
             print("*** That username is taken! ***")
             continue
@@ -65,43 +66,41 @@ def createAccount(conn):
 
 def login(conn):
     ########## Queries ##########
-    userQuery = "SELECT username FROM users"
+    #userQuery = "SELECT username FROM users"
     idPasswordQuery = "SELECT id, password FROM users where username = %s"
-    
+
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
     ########## Username ##########
-    validUser = False
-    while (not validUser):
+    while (True):
         # grab user name
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
             return
+        
+        packedIdPassword = utils.exec_get_all(conn, idPasswordQuery, (username,))
+        id = packedIdPassword[0][0]
+        expectedPassword = packedIdPassword[0][1]
 
         # get the users (hard to read)
-        allUsers = utils.exec_get_all(conn, userQuery)
+        #allUsers = utils.exec_get_all(conn, userQuery)
 
         # make the user list easy to read
-        i = 0
-        allUsersList = []
-        for user in allUsers:
-            allUsersList.append(user[0])
-            i += 1
+        # i = 0
+        # allUsersList = []
+        # for user in allUsers:
+        #     allUsersList.append(user[0])
+        #     i += 1
 
         # for debugging
-        #print(allUsersList)
-        #print(username)
+        # print(username)
 
         # check user
-        if (username in allUsersList):
-            validUser = True
+        if (id):
+            break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
-
-    ##### Password #####
-    packedIdPassword = utils.exec_get_all(conn, idPasswordQuery, (username,))
-    id = packedIdPassword[0][0]
-    expectedPassword = packedIdPassword[0][1]
+            continue
 
     # for debugging, uncomment if you want to feel like a hacker
     #print("\texpected password: " + expectedPassword) 
