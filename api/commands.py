@@ -3,6 +3,7 @@ from tabulate import tabulate
 import datetime
 import re
 
+
 # TODO char limits on everything?
 def createAccount(conn):
     print("Account Creation:")
@@ -16,22 +17,25 @@ def createAccount(conn):
         print("***" + email + " is not a valid email address ***")
         email = input("\tProvide a valid email address: ")
     
-    # password checking
-    # length [8, 64]
-    # contains a lowercase letter
-    # contains a capital letter
-    # contains a number
-    # contains a symbol
-    # does not contain a space
-    # TODO hash in phase 3
+
+    """
+    password checking
+    length [8, 64]
+    contains a lowercase letter
+    contains a capital letter
+    contains a number
+    contains a symbol
+    does not contain a space
+    TODO hash in phase 3    
+    """
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
-            (len(password) >= 8) and (len(password) <= 64) and 
-            bool(re.search("[a-z]", password)) and
-            bool(re.search("[A-Z]", password)) and
-            bool(re.search("[!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?]", password)) and
-            bool((not re.search(" ", password))))):
+           (len(password) >= 8) and (len(password) <= 64) and 
+           bool(re.search("[a-z]", password)) and
+           bool(re.search("[A-Z]", password)) and
+           bool(re.search("[!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?]", password)) and
+           bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
@@ -50,12 +54,7 @@ def createAccount(conn):
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
 
-
-# TODO store current user id (id can be -1 if no ones logged in)
 def login(conn):
-    # general idea, ask for user, ask for password and if theres a match then login
-    # else, loop until correct password (attempt limit?), ctrl e to exit?
-    
     ########## Queries ##########
     userQuery = "SELECT username FROM users"
     idPasswordQuery = "SELECT id, password FROM users where username = %s"
@@ -67,6 +66,8 @@ def login(conn):
     while (not validUser):
         # grab user name
         username = input("\tEnter your username: ")
+        if (username.lower() == "exit"):
+            return
 
         # get the users (hard to read)
         allUsers = utils.exec_get_all(conn, userQuery)
@@ -98,9 +99,9 @@ def login(conn):
     
     password = ""
     while (not (password == expectedPassword)):
-        password = input("\tEnter your password: ")
-        if (password == "exit"): # note: exit is not a valid password (see createAccount())
-            return 0
+        password = input("\t(" + username + ") Enter your password: ")
+        if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
+            return
     
     ###### Update lastaccessdate ######
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
@@ -108,7 +109,63 @@ def login(conn):
     utils.exec_commit(conn, datePrompt, (currentDatetime, id))
     
     print("Welcome back " + username)
+    utils.sessionToken = int(id)
         
+def logout():
+    print("*** You have logged out. Use LOGIN to login again ***")
+    utils.sessionToken = -1
+
+"""
+Idea here is a user will search for another user, and follow, unfollow, 
+or see their movie collections or who their following etc (whatever we want)
+"""
+def userSearch(conn):
+    searchedUsername = input("\tPlease input a username to search: ")
+
+    # search for the userId
+    searchQuery = "SELECT id FROM users WHERE username = %s"
+    searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedUsername,))[0][0]
+
+    # if the user exists we continue
+    if (searchedUserId):
+        print("\tSuccessfully found " + searchedUsername)
+        
+        # search for the userID and determine following state
+        followingQuery = """SELECT followeduserid FROM userfollowinguser WHERE
+                            followinguserid = %s and followeduserid = %s"""
+        followingId = utils.exec_get_all(conn, followingQuery, (utils.sessionToken, searchedUserId))
+        if (followingId):
+            followingString = "following"
+            actionString = "unfollow"
+        else:
+            followingString = "not following"
+            actionString = "follow"
+        print("\tYou are " + followingString + " " + searchedUsername)
+
+        # get a valid input
+        while (True):
+            action = input("\tWould you like to " + actionString + "? (y/n): ")
+            if (action.lower() not in ("y", "n")):
+                print("\tPlease enter (y)es (n)o")
+                continue
+            else:
+                break
+        
+        # if they want to change the following state
+        if (action.lower() == "y"):
+            if (followingId): # here we want to unfollow
+                actionSQL = """DELETE FROM userfollowinguser WHERE 
+                            followeduserid = %s and followinguserid = %s"""
+                pass
+            else: # here we want to follow
+                actionSQL = """INSERT INTO userfollowinguser 
+                            (followeduserid, followinguserid) VALUES (%s, %s)"""
+                pass
+            utils.exec_commit(conn, actionSQL, (searchedUserId, utils.sessionToken))
+        else:
+            pass
+    else:
+        print("\tSorry, " + searchedUsername + "is not a member of MovieDB")
 
 
 def help():
@@ -118,7 +175,7 @@ def help():
 
 
 def viewCollections(conn):
-    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    userId = utils.sessionToken
     sql = """SELECT
                 umc.name,
                 COUNT(m.title),
@@ -136,9 +193,8 @@ def viewCollections(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
 
-
 def createMovieCollection(conn):
-    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    userId = utils.sessionToken
     collectionName = input("Name your new collection: ")
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
@@ -161,6 +217,18 @@ cliCommands = {
         "helpText": "Login to your account",
         "actionFunction": login,
         "isDbAccessCommand": True
+    },
+    "LOGOUT":
+    {
+        "helpText": "Logout of your account",
+        "actionFunction": logout,
+        "isDbAccessCommand" : False
+    },
+    "SEARCH":
+    {
+        "helpText": "Search for other users",
+        "actionFunction": userSearch,
+        "isDbAccessCommand" : True
     },
     "CREATE_COLLECTION" :
     {
@@ -194,6 +262,6 @@ def passwordHelp():
     print("contain a lowercase letter")
     print("contain a capital letter")
     print("contain a number")
-    print("contain a symbol (!@#$%^&*()_+\-=\[\];':\"\\|,.<>\/?)")
+    print("contain a symbol (!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?)")
     print("contain no spaces")
     print("*******************************************************")
