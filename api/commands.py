@@ -9,7 +9,16 @@ def createAccount(conn):
     print("Account Creation:")
 
     ########## collect user info from cmd line ########## 
-    username = input("\tProvide a Username: ")
+    while (True):
+        username = input("\tProvide a Username: ")
+        userCheckQuery = "SELECT username FROM users WHERE username = %s"
+        results = utils.exec_get_one(conn, userCheckQuery, (username,))[0]
+        if (results):
+            print("*** That username is taken! ***")
+            continue
+        else:
+            break
+
     
     # email checking 
     email = input("\tProvide an email address: ")
@@ -87,7 +96,7 @@ def login(conn):
         if (username in allUsersList):
             validUser = True
         else:
-            print("*** Not a valid username ***\n*** Note: To login, you must first create an account ***")
+            print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
 
     ##### Password #####
     packedIdPassword = utils.exec_get_all(conn, idPasswordQuery, (username,))
