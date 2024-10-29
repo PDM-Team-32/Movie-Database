@@ -2,6 +2,7 @@ import psycopg2
 from sshtunnel import SSHTunnelForwarder
 import os
 
+sessionToken = -1 # init value of -1, no user logged in
 
 ## Use to connect to the database using the .env file
 def connect():

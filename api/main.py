@@ -15,7 +15,13 @@ def main():
         else:
             if(commands.cliCommands[x]["isDbAccessCommand"]):
                 # Wrap the command in the access DB stuff so we dont have to write it every time
-                accessDbWithCommand(commands.cliCommands[x]["actionFunction"])
+                # We only want to access the DB if there is a user logged in, logging in, or creating and account
+                if (utils.sessionToken > 0 or 
+                    commands.cliCommands[x]["actionFunction"] == commands.createAccount or
+                    commands.cliCommands[x]["actionFunction"] == commands.login):
+                    accessDbWithCommand(commands.cliCommands[x]["actionFunction"])
+                else:
+                    print("*** Please LOGIN before using this feature ***")
             else:
                 # Since we are not accessing the DB we can just do the thing (this is mostly only for the help function right now)
                  commands.cliCommands[x]["actionFunction"]()
