@@ -16,7 +16,6 @@ def createAccount(conn):
         results = utils.exec_get_one(conn, userCheckQuery, (username,))
         if (results):
             print("*** That username is taken! ***")
-            continue
         else:
             break
     
@@ -27,7 +26,7 @@ def createAccount(conn):
         email = input("\tProvide a valid email address: ")
     
     ###### Get a valid password (see regex or passwordHelp) ######
-    # TODO hash in phase 3    
+    # TODO hash + salt in phase 3    
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
@@ -76,7 +75,6 @@ def login(conn):
             break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
-            continue
 
     # for debugging, uncomment if you want to feel like a hacker
     # print("\texpected password: " + expectedPassword) 
@@ -135,7 +133,6 @@ def userSearch(conn):
             action = input("\tWould you like to " + actionString + "? (y/n): ")
             if (action.lower() not in ("y", "n")):
                 print("\tPlease enter (y)es (n)o")
-                continue
             else:
                 break
         
@@ -149,10 +146,11 @@ def userSearch(conn):
                             (followeduserid, followinguserid) VALUES (%s, %s)"""
             utils.exec_commit(conn, actionSQL, (searchedUserId, utils.sessionToken))
         else:
+            # put future options here
             pass
     else:
         print("\tSorry, " + searchedUsername + "is not a member of MovieDB")
-        
+
 
 def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
@@ -241,6 +239,8 @@ cliCommands = {
         "isDbAccessCommand": False
     }
 }
+
+###### Helper funcs ######
 
 ## Password helper 
 # length [8, 64]
