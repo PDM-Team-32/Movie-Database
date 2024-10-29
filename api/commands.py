@@ -106,17 +106,17 @@ def logout():
 # Idea here is a user will search for another user, and take respective following action
 # We can also see others collections here, if we want to
 def userSearch(conn):
-    searchedUsername = input("\tPlease input a username to search: ")
+    searchedEmail = input("\tPlease input an email to search: ")
 
     # search for the userId
-    searchQuery = "SELECT id FROM users WHERE username = %s"
-    searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedUsername,))
+    searchQuery = "SELECT id FROM users WHERE email = %s"
+    searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedEmail,))
     if (searchedUserId):
         searchedUserId = searchedUserId[0][0]
 
     # if the user exists we continue
     if (searchedUserId):
-        print("\tSuccessfully found " + searchedUsername)
+        print("\tSuccessfully found " + searchedEmail)
         
         # search for the userID and determine following state
         followingQuery = """SELECT followeduserid FROM userfollowinguser WHERE
@@ -128,7 +128,7 @@ def userSearch(conn):
         else:
             followingString = "not following"
             actionString = "follow"
-        print("\tYou are " + followingString + " " + searchedUsername)
+        print("\tYou are " + followingString + " " + searchedEmail)
 
         # get a valid input
         while (True):
@@ -151,7 +151,7 @@ def userSearch(conn):
             # put future options here
             pass
     else:
-        print("\tSorry, " + searchedUsername + "is not a member of MovieDB")
+        print("\tSorry, " + searchedEmail + " is not a member of MovieDB")
 
 
 def help():
