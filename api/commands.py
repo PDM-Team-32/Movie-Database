@@ -1,6 +1,6 @@
 import utils
 from tabulate import tabulate
-
+import datetime
 
 def createAccount(conn):
     print("Account Creation")
@@ -43,6 +43,22 @@ def createMovieCollection(conn):
     utils.exec_commit(conn, sql, (userId, collectionName))
 
 
+def startMovie(conn):
+    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    movieId = input("Enter the ID of your movie: ")
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
+    utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
+
+
+def endMovie(conn):
+    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    movieId = input("Enter the ID of your movie: ")
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
+    utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
+
+
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
 
@@ -71,6 +87,18 @@ cliCommands = {
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "START_MOVIE" :
+    {
+        "helpText": "Begin viewing a movie",
+        "actionFunction": startMovie,
+        "isDbAccessCommand": True
+    },
+    "END_MOVIE" :
+    {
+        "helpText": "Finish viewing a movie",
+        "actionFunction": endMovie,
         "isDbAccessCommand": True
     },
     "HELP":
