@@ -110,7 +110,9 @@ def userSearch(conn):
 
     # search for the userId
     searchQuery = "SELECT id FROM users WHERE username = %s"
-    searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedUsername,))[0][0]
+    searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedUsername,))
+    if (searchedUserId):
+        searchedUserId[0][0]
 
     # if the user exists we continue
     if (searchedUserId):
@@ -258,3 +260,8 @@ def passwordHelp():
     print("contain a symbol (!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?)")
     print("contain no spaces")
     print("*******************************************************")
+
+
+def salt():
+    # TODO dont forget to add salt to users table
+    print("SALT IS NOT IMPLEMENTED YET")
