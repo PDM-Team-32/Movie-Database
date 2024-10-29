@@ -112,7 +112,7 @@ def userSearch(conn):
     searchQuery = "SELECT id FROM users WHERE username = %s"
     searchedUserId = utils.exec_get_all(conn, searchQuery, (searchedUsername,))
     if (searchedUserId):
-        searchedUserId[0][0]
+        searchedUserId = searchedUserId[0][0]
 
     # if the user exists we continue
     if (searchedUserId):
