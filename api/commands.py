@@ -184,7 +184,39 @@ def createMovieCollection(conn):
     collectionName = input("Name your new collection: ")
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
-
+    
+def addMovieToCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName == "QUIT":
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT UserId FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    while (True):
+        movieTitle = input("Title of movie: ")
+        if movieTitle == "QUIT":
+            return       
+        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
+        movieId = utils.exec_get_one(conn, movieCheckQuery, (movieTitle,))
+        if (movieId):
+            if len(movieId)>1:
+                print()
+                #todo figure that out
+            insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
+            utils.exec_get_one(conn, accesCheckQuery, (movieId, collectionId,))
+        else:
+            print("*** Movie not found ***")
 
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
