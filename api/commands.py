@@ -180,10 +180,9 @@ def movieSearch(conn):
     if genre != "":
         searchArray.append(genre)
     sorting = (input("(OPTIONAL) Select sort option [M]ovie name, [S]tudio, [G]enre, [R]elease Year (DEFAULT Movie Name): "))
-    if sorting != "":
-        sortByArray.append(sorting)
-        order = (input("(OPTIONAL) In [A]scending or [D]ecending order? (DEFAULT Ascending): "))
-        sortByArray.append(order)
+    sortByArray.append(sorting)
+    order = (input("(OPTIONAL) In [A]scending or [D]ecending order? (DEFAULT Ascending): "))
+    sortByArray.append(order)
     orderByString = (makeOrderByString(sortByArray))
     
     sql = f"""
@@ -235,8 +234,21 @@ def movieSearch(conn):
                     )
             ORDER BY {orderByString}"""
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
-    formatted = formatMovieSearchOutput(output)
-    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio"], tablefmt='grid', maxcolwidths=[None, 20]))
+    formatted = formatMovieSearchOutput(conn, output)
+    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+
+
+def getMovieUserRating(conn, movieId):
+    sql = """
+    SELECT AVG(urm.starrating)::int
+    FROM userratesmovie AS urm
+    INNER JOIN movie as m
+        ON(m.id = urm.movieid)
+    WHERE m.id = %s"""
+    output = utils.exec_get_one(conn, sql, (movieId,))[0]
+    if output == None:
+        output = "No ratings"
+    return output
 
 def makeOrderByString(array):
     if array[0] in orderByCommands["Selection"].keys():
@@ -278,13 +290,14 @@ def watchCollection(conn):
 
 
 
-def formatMovieSearchOutput(input):
+def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(len(output)):
         output[x] = list(output[x])
         output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
+        output[x].append(getMovieUserRating(conn, output[x][0]))
     return output
         
 
@@ -300,18 +313,18 @@ def viewCollections(conn):
                 umc.name,
                 COUNT(m.title),
                 TO_CHAR(SUM(length)*'1 minute'::interval, 'HH24:MI')
-            FROM movieCollection AS mc
-            INNER JOIN userMovieCollection AS umc
-            ON (umc.id = mc.collectionid)
-            INNER JOIN movie AS m
-            ON (m.id = mc.movieid)
-            WHERE mc.collectionId IN (
-                                    SELECT id
-                                    FROM userMovieCollection
-                                    WHERE userId = 1)
+            FROM userMovieCollection AS umc
+            LEFT JOIN movieCollection AS mc
+                ON (umc.id = mc.collectionid)
+            LEFT JOIN movie AS m
+                        ON (m.id = mc.movieid)
+            WHERE  userId = 1
             GROUP BY umc.name
             ORDER BY umc.name; """
-    movies = utils.exec_get_all(conn, sql, (userId,))
+    movies = list(utils.exec_get_all(conn, sql, (userId,)))
+    for x in range(len(movies)):
+        if movies[x][2] == None:
+            movies[x] = [movies[x][0], movies[x][1], "00:00"]
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
 
 def createMovieCollection(conn):
@@ -375,13 +388,18 @@ def rateMovie(conn):
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
-    collectionName = input("Name your collection: ")
+    collectionName = input("Select the collection you want to rename: ")
     collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
     collectionId = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
     if collectionId:
         collectionName = input("Enter new name: ")
-        collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
-        utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+        sql = """SELECT id FROM usermoviecollection WHERE name = %s"""
+        duplicateNames = utils.exec_get_one(conn, sql, (collectionName,))
+        if duplicateNames == None:
+            collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
+            utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+        else:
+            print("Collection name already exists please try a different name")
     else:
         print("*** Collection not found or is not yours ***")
     
@@ -545,7 +563,7 @@ cliCommands = {
     },
     "USER_SEARCH":
     {
-        "helpText": "Search for other users",
+        "helpText": "Search for other users to follow or unfollow",
         "actionFunction": userSearch,
         "isDbAccessCommand" : True
     },
@@ -636,7 +654,7 @@ orderByCommands = {
             "S": "s.name",
             "G": "g.name",
             "R": "mp.releasedate",
-            "": "m.name"
+            "": "m.title"
         },
         "Qualifier":
         {
