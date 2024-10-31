@@ -33,7 +33,7 @@ def createAccount(conn):
            (len(password) >= 8) and (len(password) <= 64) and 
            bool(re.search("[a-z]", password)) and
            bool(re.search("[A-Z]", password)) and
-           bool(re.search("[!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?]", password)) and
+           bool(re.search("[!@#$%^&*()_+-=[]'\\|,.<>/?]", password)) and
            bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
@@ -161,6 +161,7 @@ def help():
 
 def movieSearch(conn):
     searchArray = []
+    sortByArray = []
     movieTitle = (input("(OPTIONAL) Provide a movie title to search for: "))
     if movieTitle != "":
         searchArray.append(movieTitle)
@@ -179,6 +180,13 @@ def movieSearch(conn):
     genre = (input("(OPTIONAL) Provide the genre of the movie: "))
     if genre != "":
         searchArray.append(genre)
+    sorting = (input("(OPTIONAL) Select sort option [M]ovie name, [S]tudio, [G]enre, [R]elease Year (DEFAULT Movie Name): "))
+    if sorting != "":
+        sortByArray.append(sorting)
+        order = (input("(OPTIONAL) In [A]scending or [D]ecending order? (DEFAULT Ascending): "))
+        sortByArray.append(order)
+    orderByString = (makeOrderByString(sortByArray))
+    
     sql = f"""
             SELECT
                 DISTINCT (m.id),
@@ -197,7 +205,8 @@ def movieSearch(conn):
                 array(SELECT cm.stagename
                     FROM castmember AS cm
                     INNER JOIN castdirects AS cd ON cd.castid = cm.id
-                    WHERE(m.id = cd.movieid)) AS directors
+                    WHERE(m.id = cd.movieid)) AS directors,
+                s.name
             FROM movie AS m
             INNER JOIN movieplatform AS mp
                 ON (mp.movieid = m.id)
@@ -213,6 +222,10 @@ def movieSearch(conn):
                 ON (mg.movieid = m.id)
             INNER JOIN genre as g
                 ON (g.id = mg.genreid)
+            INNER JOIN moviestudio as ms
+                ON (ms.movieid = m.id)
+            INNER JOIN studio as s
+                ON (s.id = ms.studioid)
             WHERE( m.id = m.id
                     {"AND m.title = %s" if movieTitle != "" else ""}
                     {"AND mp.releasedate > TO_DATE(%s, 'YYYY:MM:DD')" if startDate != "" else ""}
@@ -220,11 +233,50 @@ def movieSearch(conn):
                     {"AND cm.stagename = %s" if stageName != "" else ""}
                     {"AND rp.name = %s" if studio != "" else ""}
                     {"AND g.name = %s" if genre != "" else ""}
-                    
-                    );"""
+                    )
+            ORDER BY {orderByString}"""
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
     formatted = formatMovieSearchOutput(output)
-    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors"], tablefmt='grid'))
+    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio"], tablefmt='grid', maxcolwidths=[None, 20]))
+
+def makeOrderByString(array):
+    if array[0] in orderByCommands["Selection"].keys():
+        selection = orderByCommands["Selection"][array[0]]
+    else:
+        print("Invalid sort selection will default to movie name")
+        selection = orderByCommands["Selection"]["M"]
+    if array[1] in orderByCommands["Qualifier"].keys():
+        qualifier = orderByCommands["Qualifier"][array[1]]
+    else:
+        print("Invalid sort selection will default to movie name")
+        qualifier = orderByCommands["Selection"]["A"]
+    return(selection + " " + qualifier)
+
+def watchCollection(conn):
+    collectionName = (input("Give the name of the collection you want to watch: "))
+    sql = """SELECT
+                CURRENT_TIMESTAMP::timestamp AS currentTime,
+                umc.id,
+                m.id,
+                m.length
+            FROM movieCollection AS mc
+            INNER JOIN userMovieCollection AS umc
+            ON (umc.id = mc.collectionid)
+            INNER JOIN movie AS m
+            ON (m.id = mc.movieid)
+            WHERE umc.name = %s AND umc.userid = %s"""
+    movies = utils.exec_get_all(conn, sql, (collectionName, utils.sessionToken))
+    print(movies)
+    startTime = movies[0][0]
+    endTime = movies[0][0]
+    for movie in movies:
+        print(movie)
+        time_change = datetime.timedelta(minutes=movie[3]) 
+        endTime = startTime + time_change
+        sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime, endTime) VALUES (%s, %s, %s, %s)"""
+        utils.exec_commit(conn, sql, (movie[2], utils.sessionToken, startTime, endTime))
+        startTime = endTime
+
 
 
 def formatMovieSearchOutput(input):
@@ -258,7 +310,8 @@ def viewCollections(conn):
                                     SELECT id
                                     FROM userMovieCollection
                                     WHERE userId = 1)
-            GROUP BY umc.name;"""
+            GROUP BY umc.name
+            ORDER BY umc.name; """
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
 
@@ -317,6 +370,12 @@ cliCommands = {
         "actionFunction": viewCollections,
         "isDbAccessCommand": True
     },
+    "WATCH_COLLECTION" :
+    {
+        "helpText": "Binge your movie collections!",
+        "actionFunction": watchCollection,
+        "isDbAccessCommand": True
+    },
     "HELP":
     {
         "helpText": "Print this menu again",
@@ -330,6 +389,23 @@ cliCommands = {
         "isDbAccessCommand": False
     }
 }
+
+orderByCommands = {
+        "Selection":
+        {
+            "M": "m.title",
+            "S": "s.name",
+            "G": "g.name",
+            "R": "mp.releasedate",
+            "": "m.name"
+        },
+        "Qualifier":
+        {
+            "A": "ASC",
+            "D": "DESC",
+            "": "ASC"
+        }
+    }
 
 ###### Helper funcs ######
 
@@ -346,7 +422,7 @@ def passwordHelp():
     print("contain a lowercase letter")
     print("contain a capital letter")
     print("contain a number")
-    print("contain a symbol (!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?)")
+    print("contain a symbol (!@#$%^&*()_+-=[]'\\|,.<>/?)")
     print("contain no spaces")
     print("*******************************************************")
 
