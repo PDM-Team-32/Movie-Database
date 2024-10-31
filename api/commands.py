@@ -196,7 +196,7 @@ def addMovieToCollection(conn):
         results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
         if (results):
             accesCheckQuery = "SELECT UserId FROM UserMovieCollection WHERE UserId = %s and name = %s"
-            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            collectionId = utils.exec_get_all(conn, accesCheckQuery, (userId, collectionName,))
             if(collectionId):
                 break
             else:
@@ -208,11 +208,22 @@ def addMovieToCollection(conn):
         if movieTitle == "QUIT":
             return       
         movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
-        movieId = utils.exec_get_one(conn, movieCheckQuery, (movieTitle,))
+        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
         if (movieId):
             if len(movieId)>1:
-                print()
-                #todo figure that out
+                for i in range(len(movieId)):
+                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
+                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
+                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
+                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
+                    print(f"{i} {movie} {date}")
+                index = input("Enter the number of the movie you want")
+                while(index<0 or index>(len(movieId))):
+                    print("*** Invalid number ***")
+                    index = input("Enter the number of the movie you want")
+                movieId = movieId[index]
+            else:
+                movieId = movieId[0]
             insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
             utils.exec_get_one(conn, accesCheckQuery, (movieId, collectionId,))
         else:
