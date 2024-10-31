@@ -388,13 +388,18 @@ def rateMovie(conn):
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
-    collectionName = input("Name your collection: ")
+    collectionName = input("Select the collection you want to rename: ")
     collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
     collectionId = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
     if collectionId:
         collectionName = input("Enter new name: ")
-        collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
-        utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+        sql = """SELECT id FROM usermoviecollection WHERE name = %s"""
+        duplicateNames = utils.exec_get_one(conn, sql, (collectionName,))
+        if duplicateNames == None:
+            collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
+            utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+        else:
+            print("Collection name already exists please try a different name")
     else:
         print("*** Collection not found or is not yours ***")
     
