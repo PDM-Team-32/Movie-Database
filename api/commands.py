@@ -195,8 +195,8 @@ def addMovieToCollection(conn):
         collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
         results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
         if (results):
-            accesCheckQuery = "SELECT UserId FROM UserMovieCollection WHERE UserId = %s and name = %s"
-            collectionId = utils.exec_get_all(conn, accesCheckQuery, (userId, collectionName,))
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
             if(collectionId):
                 break
             else:
@@ -204,6 +204,7 @@ def addMovieToCollection(conn):
         else:
             print("*** Collection not found ***")
     while (True):
+        print("*** Type QUIT to stop ***")
         movieTitle = input("Title of movie: ")
         if movieTitle == "QUIT":
             return       
@@ -217,15 +218,24 @@ def addMovieToCollection(conn):
                     dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
                     date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
                     print(f"{i} {movie} {date}")
-                index = input("Enter the number of the movie you want")
+                index = -1
                 while(index<0 or index>(len(movieId))):
-                    print("*** Invalid number ***")
-                    index = input("Enter the number of the movie you want")
-                movieId = movieId[index]
+                    index = input("Enter the number of the movie you want ")
+                    try:
+                        index = int(index)
+                    except ValueError:
+                        index = -1
+                        print("*** Invalid number ***")
             else:
-                movieId = movieId[0]
-            insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
-            utils.exec_get_one(conn, accesCheckQuery, (movieId, collectionId,))
+                index = 0
+            try:
+                insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
+                utils.exec_commit(conn, insert, (movieId[index], collectionId,))
+            except Exception:
+                curs = conn.cursor()
+                curs.execute("ROLLBACK")
+                conn.commit()
+                print("*** Already in collection ***")
         else:
             print("*** Movie not found ***")
 
@@ -269,6 +279,12 @@ cliCommands = {
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "ADD_MOVIE_TO_COLLECTION" :
+    {
+        "helpText": "Add a movie to a collection you own",
+        "actionFunction": addMovieToCollection,
         "isDbAccessCommand": True
     },
     "HELP":
