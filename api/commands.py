@@ -317,6 +317,11 @@ def viewCollections(conn):
 def createMovieCollection(conn):
     userId = utils.sessionToken
     collectionName = input("Name your new collection: ")
+    collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+    results = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
+    if results:
+        print("*** You already have a collection named that ***")
+        return
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
 
@@ -368,6 +373,151 @@ def rateMovie(conn):
     else:
         print("You cannot rate a movie that does not exist.")
 
+def changeCollectionName(conn):
+    userId = utils.sessionToken
+    collectionName = input("Name your collection: ")
+    collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+    collectionId = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
+    if collectionId:
+        collectionName = input("Enter new name: ")
+        collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
+        utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+    else:
+        print("*** Collection not found or is not yours ***")
+    
+    
+def addMovieToCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName.casefold() == "QUIT".casefold():
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    while (True):
+        print("*** Type QUIT to stop ***")
+        movieTitle = input("Title of movie: ")
+        if movieTitle.casefold() == "QUIT".casefold():
+            return       
+        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
+        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
+        if (movieId):
+            if len(movieId)>1:
+                for i in range(len(movieId)):
+                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
+                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
+                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
+                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
+                    print(f"{i} {movie[0]} {format(date[0])}")
+                index = -1
+                while(index<0 or index>(len(movieId))):
+                    index = input("Enter the number of the movie you want: ")
+                    try:
+                        index = int(index)
+                    except ValueError:
+                        index = -1
+                        print("*** Invalid number ***")
+            else:
+                index = 0
+            try:
+                insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
+                utils.exec_commit(conn, insert, (movieId[index], collectionId,))
+            except Exception:
+                curs = conn.cursor()
+                curs.execute("ROLLBACK")
+                conn.commit()
+                print("*** Already in collection ***")
+        else:
+            print("*** Movie not found ***")
+
+def removeMovieFromCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName.casefold() == "QUIT".casefold():
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    while (True):
+        print("*** Type QUIT to stop ***")
+        movieTitle = input("Title of movie: ")
+        if movieTitle.casefold() == "QUIT".casefold():
+            return       
+        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
+        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
+        if (movieId):
+            if len(movieId)>1:
+                for i in range(len(movieId)):
+                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
+                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
+                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
+                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
+                    print(f"{i} {movie[0]} {format(date[0])}")
+                index = -1
+                while(index<0 or index>(len(movieId))):
+                    index = input("Enter the number of the movie you want: ")
+                    try:
+                        index = int(index)
+                    except ValueError:
+                        index = -1
+                        print("*** Invalid number ***")
+            else:
+                index = 0
+            movieCheckQuery = "SELECT MovieId FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+            results = utils.exec_get_one(conn, movieCheckQuery, (movieId[index], collectionId,))
+            if results:
+                delete = "DELETE FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+                utils.exec_commit(conn, delete, (movieId[index], collectionId,))
+                print("*** Deleted ***")
+            else:
+                print("*** Movie not in Collection ***")
+
+        else:
+            print("*** Movie not found ***")
+
+def deleteCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName.casefold() == "QUIT".casefold():
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    delete = "DELETE FROM MovieCollection WHERE CollectionId = %s"
+    utils.exec_commit(conn, delete, (collectionId,))
+    delete = "DELETE FROM UserMovieCollection WHERE Id = %s"
+    utils.exec_commit(conn, delete, (collectionId,))
+    print("*** Deleted ***")
 
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
@@ -439,6 +589,30 @@ cliCommands = {
     {
         "helpText": "Binge your movie collections!",
         "actionFunction": watchCollection,
+        "isDbAccessCommand": True
+    },
+    "CHANGE_COLLECTION_NAME" :
+    {
+        "helpText": "Change the name of a collection you own",
+        "actionFunction": changeCollectionName,
+        "isDbAccessCommand": True
+    },
+    "ADD_MOVIE_TO_COLLECTION" :
+    {
+        "helpText": "Add a movie to a collection you own",
+        "actionFunction": addMovieToCollection,
+        "isDbAccessCommand": True
+    },
+    "REMOVE_MOVIE_FROM_COLLECTION" :
+    {
+        "helpText": "Remove a movie to a collection you own",
+        "actionFunction": removeMovieFromCollection,
+        "isDbAccessCommand": True
+    },
+    "DELETE_COLLECTION" :
+    {
+        "helpText": "Delete a collection you own",
+        "actionFunction": deleteCollection,
         "isDbAccessCommand": True
     },
     "HELP":
