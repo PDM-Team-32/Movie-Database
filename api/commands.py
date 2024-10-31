@@ -192,9 +192,16 @@ def createMovieCollection(conn):
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
-    collectionName = input("Name your new collection: ")
-    sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
-    utils.exec_commit(conn, sql, (userId, collectionName))
+    collectionName = input("Name your collection: ")
+    collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+    collectionId = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
+    if collectionId:
+        collectionName = input("Enter new name: ")
+        collectionUpdate = "UPDATE UserMovieCollection SET Name = %s WHERE Id = %s"
+        utils.exec_commit(conn, collectionUpdate, (collectionName, collectionId))
+    else:
+        print("*** Collection not found or is not yours ***")
+    
     
 def addMovieToCollection(conn):
     userId = utils.sessionToken
@@ -231,7 +238,7 @@ def addMovieToCollection(conn):
                     print(f"{i} {movie} {date}")
                 index = -1
                 while(index<0 or index>(len(movieId))):
-                    index = input("Enter the number of the movie you want ")
+                    index = input("Enter the number of the movie you want: ")
                     try:
                         index = int(index)
                     except ValueError:
@@ -290,6 +297,12 @@ cliCommands = {
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "CHANGE_COLLECTION_NAME" :
+    {
+        "helpText": "Change the name of a collection you own",
+        "actionFunction": changeCollectionName,
         "isDbAccessCommand": True
     },
     "ADD_MOVIE_TO_COLLECTION" :
