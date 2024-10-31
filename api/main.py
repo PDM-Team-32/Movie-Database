@@ -28,7 +28,7 @@ def main():
     
     
 def getUserInput():
-    return(input('Please enter a command: '))
+    return(input('Please enter a command: ').upper())
 
 
 def accessDbWithCommand(command):

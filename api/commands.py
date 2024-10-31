@@ -3,7 +3,6 @@ from tabulate import tabulate
 import datetime
 import re
 
-
 # TODO char limits on everything
 # TODO attempt limit on while true loops
 def createAccount(conn):
@@ -33,7 +32,7 @@ def createAccount(conn):
            (len(password) >= 8) and (len(password) <= 64) and 
            bool(re.search("[a-z]", password)) and
            bool(re.search("[A-Z]", password)) and
-           bool(re.search("[!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?]", password)) and
+           bool(re.search("[!@#$%^&*()_+-=[]'\\|,.<>/?]", password)) and
            bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
@@ -159,6 +158,141 @@ def help():
     for key in cliCommands:
         print(key + ": " + cliCommands[key]["helpText"])
 
+def movieSearch(conn):
+    searchArray = []
+    sortByArray = []
+    movieTitle = (input("(OPTIONAL) Provide a movie title to search for: "))
+    if movieTitle != "":
+        searchArray.append(movieTitle)
+    startDate = (input("(OPTIONAL) Provide the lower bounds for the date YYYY:MM:DD: "))
+    if startDate != "":
+        searchArray.append(startDate)
+    endDate = (input("(OPTIONAL) Provide the upper bounds for the date YYYY:MM:DD: "))
+    if endDate != "":
+        searchArray.append(endDate)
+    stageName = (input("(OPTIONAL) Provide the stage name of a cast member from the movie: "))
+    if stageName != "":
+        searchArray.append(stageName)
+    studio = (input("(OPTIONAL) Provide the name of the studio which produced the movie: "))
+    if studio != "":
+        searchArray.append(studio)
+    genre = (input("(OPTIONAL) Provide the genre of the movie: "))
+    if genre != "":
+        searchArray.append(genre)
+    sorting = (input("(OPTIONAL) Select sort option [M]ovie name, [S]tudio, [G]enre, [R]elease Year (DEFAULT Movie Name): "))
+    if sorting != "":
+        sortByArray.append(sorting)
+        order = (input("(OPTIONAL) In [A]scending or [D]ecending order? (DEFAULT Ascending): "))
+        sortByArray.append(order)
+    orderByString = (makeOrderByString(sortByArray))
+    
+    sql = f"""
+            SELECT
+                DISTINCT (m.id),
+                m.title,
+                m.length,
+                m.mpaa_rating,
+                mp.releasedate,
+                array(SELECT rp.name
+                    FROM movieplatform AS mp
+                    INNER JOIN releaseplatform AS rp ON mp.platformid = rp.id
+                    WHERE(m.id = mp.movieid)) AS platform,
+                array(SELECT cm.stagename
+                    FROM castmember AS cm
+                    INNER JOIN castacts AS ca ON ca.castid = cm.id
+                    WHERE(m.id = ca.movieid)) AS actors,
+                array(SELECT cm.stagename
+                    FROM castmember AS cm
+                    INNER JOIN castdirects AS cd ON cd.castid = cm.id
+                    WHERE(m.id = cd.movieid)) AS directors,
+                s.name
+            FROM movie AS m
+            INNER JOIN movieplatform AS mp
+                ON (mp.movieid = m.id)
+            INNER JOIN releaseplatform AS rp
+                ON (rp.id = mp.platformid)
+            INNER JOIN castacts AS ca
+                ON (ca.movieid = m.id)
+            INNER JOIN castdirects AS cd
+                ON (cd.movieid = m.id)
+            INNER JOIN castmember AS cm
+                ON (cd.castid = cm.id OR ca.castid = cm.id)
+            INNER JOIN moviegenre AS mg
+                ON (mg.movieid = m.id)
+            INNER JOIN genre as g
+                ON (g.id = mg.genreid)
+            INNER JOIN moviestudio as ms
+                ON (ms.movieid = m.id)
+            INNER JOIN studio as s
+                ON (s.id = ms.studioid)
+            WHERE( m.id = m.id
+                    {"AND m.title = %s" if movieTitle != "" else ""}
+                    {"AND mp.releasedate > TO_DATE(%s, 'YYYY:MM:DD')" if startDate != "" else ""}
+                    {"AND mp.releasedate < TO_DATE(%s, 'YYYY:MM:DD')" if endDate != "" else ""}
+                    {"AND cm.stagename = %s" if stageName != "" else ""}
+                    {"AND rp.name = %s" if studio != "" else ""}
+                    {"AND g.name = %s" if genre != "" else ""}
+                    )
+            ORDER BY {orderByString}"""
+    output = utils.exec_get_all(conn, sql, tuple(searchArray))
+    formatted = formatMovieSearchOutput(output)
+    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio"], tablefmt='grid', maxcolwidths=[None, 20]))
+
+def makeOrderByString(array):
+    if array[0] in orderByCommands["Selection"].keys():
+        selection = orderByCommands["Selection"][array[0]]
+    else:
+        print("Invalid sort selection will default to movie name")
+        selection = orderByCommands["Selection"]["M"]
+    if array[1] in orderByCommands["Qualifier"].keys():
+        qualifier = orderByCommands["Qualifier"][array[1]]
+    else:
+        print("Invalid sort selection will default to movie name")
+        qualifier = orderByCommands["Selection"]["A"]
+    return(selection + " " + qualifier)
+
+def watchCollection(conn):
+    collectionName = (input("Give the name of the collection you want to watch: "))
+    sql = """SELECT
+                CURRENT_TIMESTAMP::timestamp AS currentTime,
+                umc.id,
+                m.id,
+                m.length
+            FROM movieCollection AS mc
+            INNER JOIN userMovieCollection AS umc
+            ON (umc.id = mc.collectionid)
+            INNER JOIN movie AS m
+            ON (m.id = mc.movieid)
+            WHERE umc.name = %s AND umc.userid = %s"""
+    movies = utils.exec_get_all(conn, sql, (collectionName, utils.sessionToken))
+    print(movies)
+    startTime = movies[0][0]
+    endTime = movies[0][0]
+    for movie in movies:
+        print(movie)
+        time_change = datetime.timedelta(minutes=movie[3]) 
+        endTime = startTime + time_change
+        sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime, endTime) VALUES (%s, %s, %s, %s)"""
+        utils.exec_commit(conn, sql, (movie[2], utils.sessionToken, startTime, endTime))
+        startTime = endTime
+
+
+
+def formatMovieSearchOutput(input):
+    output = list(input)
+    for x in range(len(output)):
+        output[x] = list(output[x])
+        output[x][5] = formatArrayToTallString(output[x][5])
+        output[x][6] = formatArrayToTallString(output[x][6])
+        output[x][7] = formatArrayToTallString(output[x][7])
+    return output
+        
+
+def formatArrayToTallString(array):
+    outString = ""
+    for x in array:
+        outString += x + "\n"
+    return outString
 
 def viewCollections(conn):
     userId = utils.sessionToken
@@ -175,7 +309,8 @@ def viewCollections(conn):
                                     SELECT id
                                     FROM userMovieCollection
                                     WHERE userId = 1)
-            GROUP BY umc.name;"""
+            GROUP BY umc.name
+            ORDER BY umc.name; """
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
 
@@ -189,6 +324,54 @@ def createMovieCollection(conn):
         return
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
+
+
+def startMovie(conn):
+    userId = utils.sessionToken
+    movieId = input("Enter the ID of your movie: ")
+
+    sql = """SELECT title FROM movie WHERE movie.id = %s"""
+    movie = utils.exec_get_one(conn, sql, (movieId,))
+
+    if movie:
+        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+        sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
+        utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
+    else:
+        print("You cannot view a movie that does not exist.")
+
+
+def endMovie(conn):
+    userId = utils.sessionToken
+    movieId = input("Enter the ID of your movie: ")
+
+    sql = """SELECT startTime FROM userWatchesMovie AS uwm WHERE uwm.userId = %s AND uwm.movieId = %s"""
+    movie = utils.exec_get_one(conn, sql, (userId, movieId))
+
+    if movie:
+        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+        sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
+        utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
+    else:
+        print("You have not begun viewing this movie.")
+
+
+def rateMovie(conn):
+    userId = utils.sessionToken
+    movieId = input("Enter the ID of the movie to rate: ")
+
+    sql = """SELECT title FROM movie WHERE movie.id = %s"""
+    movie = utils.exec_get_one(conn, sql, (movieId,))
+
+    if movie:
+        rating = input("Enter a star rating from 1 to 5: ")
+        if int(rating) < 1 or int(rating) > 5:
+            print("Invalid rating.")
+        else:
+            sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
+            utils.exec_commit(conn, sql, (movieId, userId, rating))
+    else:
+        print("You cannot rate a movie that does not exist.")
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
@@ -360,7 +543,7 @@ cliCommands = {
         "actionFunction": logout,
         "isDbAccessCommand" : False
     },
-    "SEARCH":
+    "USER_SEARCH":
     {
         "helpText": "Search for other users",
         "actionFunction": userSearch,
@@ -372,10 +555,40 @@ cliCommands = {
         "actionFunction": createMovieCollection,
         "isDbAccessCommand": True
     },
+    "MOVIE_SEARCH":
+    {
+        "helpText": "Search for movie with given criteria",
+        "actionFunction": movieSearch,
+        "isDbAccessCommand": True
+    },
     "VIEW_COLLECTION" :
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "START_MOVIE" :
+    {
+        "helpText": "Begin viewing a movie",
+        "actionFunction": startMovie,
+        "isDbAccessCommand": True
+    },
+    "END_MOVIE" :
+    {
+        "helpText": "Finish viewing a movie",
+        "actionFunction": endMovie,
+        "isDbAccessCommand": True
+    },
+    "RATE_MOVIE" :
+    {
+        "helpText": "Give a movie a star rating (1-5)",
+        "actionFunction": rateMovie,
+        "isDbAccessCommand": True
+    },
+    "WATCH_COLLECTION" :
+    {
+        "helpText": "Binge your movie collections!",
+        "actionFunction": watchCollection,
         "isDbAccessCommand": True
     },
     "CHANGE_COLLECTION_NAME" :
@@ -416,6 +629,23 @@ cliCommands = {
     }
 }
 
+orderByCommands = {
+        "Selection":
+        {
+            "M": "m.title",
+            "S": "s.name",
+            "G": "g.name",
+            "R": "mp.releasedate",
+            "": "m.name"
+        },
+        "Qualifier":
+        {
+            "A": "ASC",
+            "D": "DESC",
+            "": "ASC"
+        }
+    }
+
 ###### Helper funcs ######
 
 ## Password helper 
@@ -431,7 +661,7 @@ def passwordHelp():
     print("contain a lowercase letter")
     print("contain a capital letter")
     print("contain a number")
-    print("contain a symbol (!@#$%^&*()_+\-=\[\]'\\\|,.<>\/?)")
+    print("contain a symbol (!@#$%^&*()_+-=[]'\\|,.<>/?)")
     print("contain no spaces")
     print("*******************************************************")
 

@@ -68,11 +68,11 @@ CREATE TABLE MoviePlatform(
 CREATE TABLE UserWatchesMovie(
     MovieId INT NOT NULL,
     UserId INT NOT NULL,
+    StartTime TIMESTAMP NOT NULL,
     CONSTRAINT "UserWatchesMovie_PK"
-        PRIMARY KEY (MovieId, UserId),
+        PRIMARY KEY (MovieId, UserId, StartTime),
     FOREIGN KEY (UserId) REFERENCES Users(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id),
-    StartTime TIMESTAMP NOT NULL,
     EndTime TIMESTAMP DEFAULT NULL
 );
 
