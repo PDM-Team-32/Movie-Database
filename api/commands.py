@@ -208,7 +208,7 @@ def addMovieToCollection(conn):
     print("*** Type QUIT to stop ***")
     while (True):
         collectionName = input("Name of collection: ")
-        if collectionName == "QUIT":
+        if collectionName.casefold() == "QUIT".casefold():
             return       
         collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
         results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
@@ -224,7 +224,7 @@ def addMovieToCollection(conn):
     while (True):
         print("*** Type QUIT to stop ***")
         movieTitle = input("Title of movie: ")
-        if movieTitle == "QUIT":
+        if movieTitle.casefold() == "QUIT".casefold():
             return       
         movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
         movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
@@ -262,7 +262,7 @@ def removeMovieToCollection(conn):
     print("*** Type QUIT to stop ***")
     while (True):
         collectionName = input("Name of collection: ")
-        if collectionName == "QUIT":
+        if collectionName.casefold() == "QUIT".casefold():
             return       
         collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
         results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
@@ -278,7 +278,7 @@ def removeMovieToCollection(conn):
     while (True):
         print("*** Type QUIT to stop ***")
         movieTitle = input("Title of movie: ")
-        if movieTitle == "QUIT":
+        if movieTitle.casefold() == "QUIT".casefold():
             return       
         movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
         movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
@@ -311,6 +311,30 @@ def removeMovieToCollection(conn):
 
         else:
             print("*** Movie not found ***")
+
+def deleteCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName.casefold() == "QUIT".casefold():
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    delete = "DELETE FROM MovieCollection WHERE CollectionId = %s"
+    utils.exec_commit(conn, delete, (collectionId,))
+    delete = "DELETE FROM UserMovieCollection WHERE Id = %s"
+    utils.exec_commit(conn, delete, (collectionId,))
+    print("*** Deleted ***")
 
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
@@ -366,10 +390,16 @@ cliCommands = {
         "actionFunction": addMovieToCollection,
         "isDbAccessCommand": True
     },
-    "REMOVE_MOVIE_TO_COLLECTION" :
+    "REMOVE_MOVIE_FROM_COLLECTION" :
     {
-        "helpText": "Add a movie to a collection you own",
+        "helpText": "Remove a movie to a collection you own",
         "actionFunction": removeMovieToCollection,
+        "isDbAccessCommand": True
+    },
+    "DELETE_COLLECTION" :
+    {
+        "helpText": "Delete a collection you own",
+        "actionFunction": deleteCollection,
         "isDbAccessCommand": True
     },
     "HELP":
