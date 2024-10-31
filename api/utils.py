@@ -2,6 +2,7 @@ import psycopg2
 from sshtunnel import SSHTunnelForwarder
 import os
 
+sessionToken = -1 # init value of -1, no user logged in
 
 ## Use to connect to the database using the .env file
 def connect():
@@ -29,7 +30,6 @@ def exec_sql_file(conn, path):
     with open(full_path, 'r') as file:
         cur.execute(file.read())
     conn.commit()
-    conn.close()
 
 ## Use this to SELECT the top entry from the DB
 #
@@ -39,14 +39,12 @@ def exec_get_one(conn, sql, args={}):
     cur = conn.cursor()
     cur.execute(sql, args)
     one = cur.fetchone()
-    conn.close()
     return one
 
 def exec_commit_many(conn, sql, args):
     cur = conn.cursor()
     result = cur.executemany(sql, args)
     conn.commit()
-    conn.close()
     return result
 
 ## Use this to SELECT all entries from the database which match the select criteria
@@ -57,7 +55,6 @@ def exec_get_all(conn, sql, args={}):
     cur = conn.cursor()
     cur.execute(sql, args)
     list_of_tuples = cur.fetchall()
-    conn.close()
     return list_of_tuples
 
 ## Use this to INSERT an entry into the database
@@ -68,7 +65,6 @@ def exec_commit(conn, sql, args={}):
     cur = conn.cursor()
     result = cur.execute(sql, args)
     conn.commit()
-    conn.close()
     return result
 
 ## Returns ID of whatever was committed
@@ -81,6 +77,5 @@ def exec_commit_with_id(conn, sql, args={}):
     #To get any returning items, must do a fetchall
     result = cur.fetchall()
     conn.commit()
-    conn.close()
     return result
 

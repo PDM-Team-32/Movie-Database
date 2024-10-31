@@ -3,24 +3,57 @@ import psycopg2
 import os
 from sshtunnel import SSHTunnelForwarder
 import dotenv
-
-cliCommands = {
-    "CREATE_ACCOUNT": "Create your new account", 
-    "LOGIN <Username> <Password>": "Login to your account",
-    "CREATE_COLLECTION <Collection name>" : "Create a new (empty) Movie Collection"}
+import commands
 
 def main():
     dotenv.load_dotenv("./credentials.env")
-    cliMenu()
-    # accessDBExample()
+    commands.help()
+    # Set x to the user input and ensure it does not ask us to quit
+    while (x := getUserInput()) != "QUIT":
+        if(x not in commands.cliCommands.keys()):
+            print("Please enter a valid input")
+        else:
+            if(commands.cliCommands[x]["isDbAccessCommand"]):
+                # Wrap the command in the access DB stuff so we dont have to write it every time
+                # We only want to access the DB if there is a user logged in, logging in, or creating and account
+                if (utils.sessionToken > 0 or 
+                    commands.cliCommands[x]["actionFunction"] == commands.createAccount or
+                    commands.cliCommands[x]["actionFunction"] == commands.login):
+                    accessDbWithCommand(commands.cliCommands[x]["actionFunction"])
+                else:
+                    print("*** Please LOGIN before using this feature ***")
+            else:
+                # Since we are not accessing the DB we can just do the thing (this is mostly only for the help function right now)
+                 commands.cliCommands[x]["actionFunction"]()
     
     
-def cliMenu():
-    print("*** COMMAND LINE INTERFACE MENU ***")
-    for key in cliCommands:
-        print(key + ": " + cliCommands[key])
-    
-    
+def getUserInput():
+    return(input('Please enter a command: ').upper())
+
+
+def accessDbWithCommand(command):
+    with SSHTunnelForwarder(('starbug.cs.rit.edu', 22),
+                            ssh_username=os.getenv("DB_USER"),
+                            ssh_password=os.getenv("PASSWORD"),
+                            remote_bind_address=('127.0.0.1', 5432)) as server:
+            server.start()
+            print("SSH tunnel established")
+            params = {
+                'database': os.getenv("NAME"),
+                'user': os.getenv("DB_USER"),
+                'password': os.getenv("PASSWORD"),
+                'host': os.getenv("HOST"),
+                'port': server.local_bind_port
+            }
+            conn = psycopg2.connect(**params)
+            print("Database connection established")
+            # Everything above is just some database connection magic here we actually execute the command
+            # All functions which access the DB will accept the conn value as a param.
+            # Normally I would opt for a cleaner solution but because we cannot return from this function without breaking the connection this is what Ive got.
+            command(conn)
+
+            conn.close()
+
 def accessDBExample():
     try:
         with SSHTunnelForwarder(('starbug.cs.rit.edu', 22),
@@ -45,6 +78,7 @@ def accessDBExample():
                 conn.close()
     except:
          print("Connection Failed")
+
 
 if __name__ == "__main__":
     main()
