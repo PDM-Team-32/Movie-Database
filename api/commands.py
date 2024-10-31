@@ -235,7 +235,7 @@ def addMovieToCollection(conn):
                     movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
                     dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
                     date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
-                    print(f"{i} {movie} {date}")
+                    print(f"{i} {movie[0]} {format(date[0])}")
                 index = -1
                 while(index<0 or index>(len(movieId))):
                     index = input("Enter the number of the movie you want: ")
@@ -289,7 +289,7 @@ def removeMovieToCollection(conn):
                     movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
                     dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
                     date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
-                    print(f"{i} {movie} {date}")
+                    print(f"{i} {movie[0]} {format(date[0])}")
                 index = -1
                 while(index<0 or index>(len(movieId))):
                     index = input("Enter the number of the movie you want: ")
