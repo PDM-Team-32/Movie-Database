@@ -3,8 +3,8 @@ CREATE TABLE Users(
     FirstName VARCHAR(32) NOT NULL,
     LastName VARCHAR(32) NOT NULL,
     Email VARCHAR(320) NOT NULL,
-    UserName VARCHAR(32) NOT NULL,
-    Password INT NOT NULL,
+    UserName VARCHAR(32) NOT NULL UNIQUE,
+    Password VARCHAR(64) NOT NULL,
     CreationDate DATE NOT NULL,
     LastAccessDate DATE NOT NULL
 );
@@ -43,7 +43,7 @@ CREATE TABLE UserMovieCollection(
     id SERIAL PRIMARY KEY,
     UserId INT NOT NULL,
     FOREIGN KEY (UserId)   REFERENCES Users(id),
-    Name VARCHAR(30) DEFAULT 'My Collection'
+    Name VARCHAR(128) DEFAULT 'My Collection'
 );
 
 CREATE TABLE MovieGenre(
@@ -68,11 +68,11 @@ CREATE TABLE MoviePlatform(
 CREATE TABLE UserWatchesMovie(
     MovieId INT NOT NULL,
     UserId INT NOT NULL,
+    StartTime TIMESTAMP NOT NULL,
     CONSTRAINT "UserWatchesMovie_PK"
-        PRIMARY KEY (MovieId, UserId),
+        PRIMARY KEY (MovieId, UserId, StartTime),
     FOREIGN KEY (UserId) REFERENCES Users(id),
     FOREIGN KEY (MovieId) REFERENCES Movie(id),
-    StartTime TIMESTAMP NOT NULL,
     EndTime TIMESTAMP DEFAULT NULL
 );
 
