@@ -182,6 +182,17 @@ def viewCollections(conn):
 def createMovieCollection(conn):
     userId = utils.sessionToken
     collectionName = input("Name your new collection: ")
+    collectionCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+    results = utils.exec_get_one(conn, collectionCheckQuery, (userId, collectionName,))
+    if results:
+        print("*** You already have a collection named that ***")
+        return
+    sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
+    utils.exec_commit(conn, sql, (userId, collectionName))
+
+def changeCollectionName(conn):
+    userId = utils.sessionToken
+    collectionName = input("Name your new collection: ")
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
     
