@@ -293,7 +293,7 @@ cliCommands = {
         "actionFunction": logout,
         "isDbAccessCommand" : False
     },
-    "SEARCH":
+    "USER_SEARCH":
     {
         "helpText": "Search for other users",
         "actionFunction": userSearch,
