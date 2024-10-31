@@ -440,7 +440,7 @@ def addMovieToCollection(conn):
         else:
             print("*** Movie not found ***")
 
-def removeMovieToCollection(conn):
+def removeMovieFromCollection(conn):
     userId = utils.sessionToken
     print("*** Type QUIT to stop ***")
     while (True):
@@ -606,7 +606,7 @@ cliCommands = {
     "REMOVE_MOVIE_FROM_COLLECTION" :
     {
         "helpText": "Remove a movie to a collection you own",
-        "actionFunction": removeMovieToCollection,
+        "actionFunction": removeMovieFromCollection,
         "isDbAccessCommand": True
     },
     "DELETE_COLLECTION" :
