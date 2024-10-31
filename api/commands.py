@@ -257,6 +257,61 @@ def addMovieToCollection(conn):
         else:
             print("*** Movie not found ***")
 
+def removeMovieToCollection(conn):
+    userId = utils.sessionToken
+    print("*** Type QUIT to stop ***")
+    while (True):
+        collectionName = input("Name of collection: ")
+        if collectionName == "QUIT":
+            return       
+        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
+        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
+        if (results):
+            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
+            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
+            if(collectionId):
+                break
+            else:
+                print("*** You Do Not Own That Collection ***")
+        else:
+            print("*** Collection not found ***")
+    while (True):
+        print("*** Type QUIT to stop ***")
+        movieTitle = input("Title of movie: ")
+        if movieTitle == "QUIT":
+            return       
+        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
+        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
+        if (movieId):
+            if len(movieId)>1:
+                for i in range(len(movieId)):
+                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
+                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
+                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
+                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
+                    print(f"{i} {movie} {date}")
+                index = -1
+                while(index<0 or index>(len(movieId))):
+                    index = input("Enter the number of the movie you want: ")
+                    try:
+                        index = int(index)
+                    except ValueError:
+                        index = -1
+                        print("*** Invalid number ***")
+            else:
+                index = 0
+            movieCheckQuery = "SELECT MovieId FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+            results = utils.exec_get_one(conn, movieCheckQuery, (movieId[index], collectionId,))
+            if results:
+                delete = "DELETE FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+                utils.exec_commit(conn, delete, (movieId[index], collectionId,))
+                print("*** Deleted ***")
+            else:
+                print("*** Movie not in Collection ***")
+
+        else:
+            print("*** Movie not found ***")
+
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
 
@@ -309,6 +364,12 @@ cliCommands = {
     {
         "helpText": "Add a movie to a collection you own",
         "actionFunction": addMovieToCollection,
+        "isDbAccessCommand": True
+    },
+    "REMOVE_MOVIE_TO_COLLECTION" :
+    {
+        "helpText": "Add a movie to a collection you own",
+        "actionFunction": removeMovieToCollection,
         "isDbAccessCommand": True
     },
     "HELP":
