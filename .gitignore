@@ -1,3 +1,4 @@
 .idea
 *.env
 *.pyc
+api/__pycache__/utils.cpython-312.pyc
