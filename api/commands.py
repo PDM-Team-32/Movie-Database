@@ -44,7 +44,7 @@ def createMovieCollection(conn):
 
 
 def startMovie(conn):
-    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
 
     sql = """SELECT title FROM movie WHERE movie.id = %s"""
@@ -59,7 +59,7 @@ def startMovie(conn):
 
 
 def endMovie(conn):
-    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
 
     sql = """SELECT startTime FROM userWatchesMovie AS uwm WHERE uwm.userId = %s AND uwm.movieId = %s"""
@@ -74,7 +74,7 @@ def endMovie(conn):
 
 
 def rateMovie(conn):
-    userId = input("Provide a user ID (this is temporary until we create a login and track current userId): ")
+    userId = utils.sessionToken
     movieId = input("Enter the ID of the movie to rate: ")
 
     sql = """SELECT title FROM movie WHERE movie.id = %s"""
