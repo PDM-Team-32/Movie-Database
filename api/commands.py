@@ -434,6 +434,7 @@ cliCommands = {
         "helpText": "Give a movie a star rating (1-5)",
         "actionFunction": rateMovie,
         "isDbAccessCommand": True
+    },
     "WATCH_COLLECTION" :
     {
         "helpText": "Binge your movie collections!",
