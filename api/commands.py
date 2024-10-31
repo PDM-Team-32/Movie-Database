@@ -563,7 +563,7 @@ cliCommands = {
     },
     "USER_SEARCH":
     {
-        "helpText": "Search for other users",
+        "helpText": "Search for other users to follow or unfollow",
         "actionFunction": userSearch,
         "isDbAccessCommand" : True
     },
