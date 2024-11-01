@@ -373,7 +373,11 @@ def rateMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of the movie to rate: ")
 
-    sql = """SELECT title FROM movie WHERE movie.id = %s"""
+    sql = """SELECT title
+            FROM movie AS m
+            WHERE m.id = %s AND m.id IN (SELECT movieid
+                                        FROM userwatchesmovie AS uwm
+                                        WHERE userid = %s)"""
     movie = utils.exec_get_one(conn, sql, (movieId,))
 
     if movie:
