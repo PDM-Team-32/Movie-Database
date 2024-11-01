@@ -192,6 +192,7 @@ def movieSearch(conn):
                 m.length,
                 m.mpaa_rating,
                 mp.releasedate,
+                g.name,
                 array(SELECT rp.name
                     FROM movieplatform AS mp
                     INNER JOIN releaseplatform AS rp ON mp.platformid = rp.id
@@ -234,9 +235,11 @@ def movieSearch(conn):
                     )
             ORDER BY {orderByString}"""
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
-    formatted = formatMovieSearchOutput(conn, output)
-    print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
-
+    if (output): # if there are no results and we get a blank array, tabulate crashes
+        formatted = formatMovieSearchOutput(conn, output)
+        print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+    else:
+        print("No results found")
 
 def getMovieUserRating(conn, movieId):
     sql = """
@@ -297,9 +300,9 @@ def formatMovieSearchOutput(conn, input):
         id = output[x][1] # get the id
         output[x] = output[x][1:] # kill the id for outputting
         output[x] = list(output[x])
-        output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
+        output[x][8] = formatArrayToTallString(output[x][8])
         output[x].append(getMovieUserRating(conn, output[x][0]))
     return output
         
