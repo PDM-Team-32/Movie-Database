@@ -240,7 +240,7 @@ def movieSearch(conn):
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
     if (output): # if there are no results and we get a blank array, tabulate crashes
         formatted = formatMovieSearchOutput(conn, output)
-        print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+        print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
     else:
         print("No results found")
 
@@ -283,11 +283,9 @@ def watchCollection(conn):
             ON (m.id = mc.movieid)
             WHERE umc.name = %s AND umc.userid = %s"""
     movies = utils.exec_get_all(conn, sql, (collectionName, utils.sessionToken))
-    print(movies)
     startTime = movies[0][0]
     endTime = movies[0][0]
     for movie in movies:
-        print(movie)
         time_change = datetime.timedelta(minutes=movie[3]) 
         endTime = startTime + time_change
         sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime, endTime) VALUES (%s, %s, %s, %s)"""
@@ -299,12 +297,13 @@ def watchCollection(conn):
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
-        id = output[x][0] # get the id 
-        output[x] = list(output[x][1:]) # kill the id for outputting
-        output[x][4] = formatArrayToTallString(output[x][4])
+        # id = output[x][0] # get the id 
+        # output[x] = list(output[x][1:]) # kill the id for outputting
+        #output[x][4] = formatArrayToTallString(output[x][4])
         output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
+        output[x][8] = formatArrayToTallString(output[x][8])
         output[x].append(getMovieUserRating(conn, id))
     return output
         
