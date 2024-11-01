@@ -375,10 +375,10 @@ def rateMovie(conn):
 
     sql = """SELECT title
             FROM movie AS m
-            WHERE m.id = %s AND m.id IN (SELECT movieid
+            WHERE m.id = %s AND m.id IN (SELECT DISTINCT (movieid)
                                         FROM userwatchesmovie AS uwm
                                         WHERE userid = %s)"""
-    movie = utils.exec_get_one(conn, sql, (movieId,))
+    movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken))
 
     if movie:
         rating = input("Enter a star rating from 1 to 5: ")
