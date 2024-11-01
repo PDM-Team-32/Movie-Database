@@ -383,10 +383,12 @@ def rateMovie(conn):
 
     sql = """SELECT title
             FROM movie AS m
-            WHERE m.id = %s AND m.id IN (SELECT DISTINCT (movieid)
-                                        FROM userwatchesmovie AS uwm
-                                        WHERE userid = %s)"""
-    movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken))
+            WHERE m.id = %s AND m.id IN (SELECT movieid
+                                        FROM userwatchesmovie
+                                        WHERE  userid = %s AND movieid NOT IN (SELECT movieid
+                                                                            FROM userratesmovie
+                                                                            WHERE userid = %s))"""
+    movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken, utils.sessionToken))
 
     if movie:
         rating = input("Enter a star rating from 1 to 5: ")
@@ -396,7 +398,7 @@ def rateMovie(conn):
             sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
             utils.exec_commit(conn, sql, (movieId, userId, rating))
     else:
-        print("You cannot rate a movie that does not exist.")
+        print("You cannot rate a movie that does not exist or that you have already rated.")
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
