@@ -192,7 +192,10 @@ def movieSearch(conn):
                 m.length,
                 m.mpaa_rating,
                 mp.releasedate,
-                g.name,
+                array(SELECT g.name
+                    FROM genre AS g
+                    INNER JOIN moviegenre AS mg On g.id = mg.genreid
+                    WHERE mg.movieid = m.id) AS genres,
                 array(SELECT rp.name
                     FROM movieplatform AS mp
                     INNER JOIN releaseplatform AS rp ON mp.platformid = rp.id
@@ -237,7 +240,7 @@ def movieSearch(conn):
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
     if (output): # if there are no results and we get a blank array, tabulate crashes
         formatted = formatMovieSearchOutput(conn, output)
-        print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+        print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
     else:
         print("No results found")
 
@@ -295,15 +298,14 @@ def watchCollection(conn):
 
 def formatMovieSearchOutput(conn, input):
     output = list(input)
-    print(output)
     for x in range(0, len(output)):
-        id = output[x][1] # get the id
-        output[x] = output[x][1:] # kill the id for outputting
-        output[x] = list(output[x])
+        id = output[x][0] # get the id 
+        output[x] = list(output[x][1:]) # kill the id for outputting
+        output[x][4] = formatArrayToTallString(output[x][4])
+        output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
-        output[x][8] = formatArrayToTallString(output[x][8])
-        output[x].append(getMovieUserRating(conn, output[x][0]))
+        output[x].append(getMovieUserRating(conn, id))
     return output
         
 
