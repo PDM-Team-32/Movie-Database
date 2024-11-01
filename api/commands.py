@@ -32,7 +32,7 @@ def createAccount(conn):
            (len(password) >= 8) and (len(password) <= 64) and 
            bool(re.search("[a-z]", password)) and
            bool(re.search("[A-Z]", password)) and
-           bool(re.search("[!@#$%^&*()_+-=[]'\\|,.<>/?]", password)) and
+           bool(re.search(r"[!@#\$%\^&\*\(\)_\+\-\=\[\]\'\\\|,\.<>\?/]", password)) and
            bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
@@ -235,7 +235,7 @@ def movieSearch(conn):
             ORDER BY {orderByString}"""
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
     formatted = formatMovieSearchOutput(conn, output)
-    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+    print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
 
 
 def getMovieUserRating(conn, movieId):
@@ -292,7 +292,10 @@ def watchCollection(conn):
 
 def formatMovieSearchOutput(conn, input):
     output = list(input)
-    for x in range(len(output)):
+    print(output)
+    for x in range(0, len(output)):
+        id = output[x][1] # get the id
+        output[x] = output[x][1:] # kill the id for outputting
         output[x] = list(output[x])
         output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
@@ -318,7 +321,7 @@ def viewCollections(conn):
                 ON (umc.id = mc.collectionid)
             LEFT JOIN movie AS m
                         ON (m.id = mc.movieid)
-            WHERE  userId = 1
+            WHERE  userId = %s
             GROUP BY umc.name
             ORDER BY umc.name; """
     movies = list(utils.exec_get_all(conn, sql, (userId,)))
