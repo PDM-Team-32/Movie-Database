@@ -32,7 +32,7 @@ def createAccount(conn):
            (len(password) >= 8) and (len(password) <= 64) and 
            bool(re.search("[a-z]", password)) and
            bool(re.search("[A-Z]", password)) and
-           bool(re.search("[!@#$%^&*()_+-=[]'\\|,.<>/?]", password)) and
+           bool(re.search(r"[!@#\$%\^&\*\(\)_\+\-\=\[\]\'\\\|,\.<>\?/]", password)) and
            bool((not re.search(" ", password))))):
         print("*** That was not a valid password ***")
         passwordHelp()
@@ -192,6 +192,10 @@ def movieSearch(conn):
                 m.length,
                 m.mpaa_rating,
                 mp.releasedate,
+                array(SELECT g.name
+                    FROM genre AS g
+                    INNER JOIN moviegenre AS mg On g.id = mg.genreid
+                    WHERE mg.movieid = m.id) AS genres,
                 array(SELECT rp.name
                     FROM movieplatform AS mp
                     INNER JOIN releaseplatform AS rp ON mp.platformid = rp.id
@@ -234,9 +238,11 @@ def movieSearch(conn):
                     )
             ORDER BY {orderByString}"""
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
-    formatted = formatMovieSearchOutput(conn, output)
-    print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
-
+    if (output): # if there are no results and we get a blank array, tabulate crashes
+        formatted = formatMovieSearchOutput(conn, output)
+        print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+    else:
+        print("No results found")
 
 def getMovieUserRating(conn, movieId):
     sql = """
@@ -292,12 +298,14 @@ def watchCollection(conn):
 
 def formatMovieSearchOutput(conn, input):
     output = list(input)
-    for x in range(len(output)):
-        output[x] = list(output[x])
+    for x in range(0, len(output)):
+        id = output[x][0] # get the id 
+        output[x] = list(output[x][1:]) # kill the id for outputting
+        output[x][4] = formatArrayToTallString(output[x][4])
         output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
-        output[x].append(getMovieUserRating(conn, output[x][0]))
+        output[x].append(getMovieUserRating(conn, id))
     return output
         
 
@@ -318,7 +326,7 @@ def viewCollections(conn):
                 ON (umc.id = mc.collectionid)
             LEFT JOIN movie AS m
                         ON (m.id = mc.movieid)
-            WHERE  userId = 1
+            WHERE  userId = %s
             GROUP BY umc.name
             ORDER BY umc.name; """
     movies = list(utils.exec_get_all(conn, sql, (userId,)))
