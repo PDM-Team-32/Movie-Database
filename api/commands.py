@@ -314,6 +314,16 @@ def formatArrayToTallString(array):
         outString += x + "\n"
     return outString
 
+def collectionCount(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                COUNT(umc.name)
+            FROM userMovieCollection AS umc
+            WHERE  userId = %s;"""
+    count = utils.exec_get_one(conn, sql, (userId,))
+    print("You have " + str(count[0]) + " collections!")
+
+
 def viewCollections(conn):
     userId = utils.sessionToken
     sql = """SELECT
@@ -590,6 +600,12 @@ cliCommands = {
     {
         "helpText": "Search for movie with given criteria",
         "actionFunction": movieSearch,
+        "isDbAccessCommand": True
+    },
+    "COLLECTION_COUNT":
+    {
+        "helpText": "Get the number of collections you own",
+        "actionFunction": collectionCount,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
