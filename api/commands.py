@@ -356,6 +356,22 @@ def createMovieCollection(conn):
     utils.exec_commit(conn, sql, (userId, collectionName))
 
 
+def getTopTenMovies(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                urm.starrating
+            FROM movie AS m
+                INNER JOIN userRatesMovie AS urm
+            ON(urm.movieid = m.id)
+            WHERE  urm.userId = %s
+            ORDER BY urm.starrating DESC
+            LIMIT 10;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
+
+
+
 def startMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -606,6 +622,12 @@ cliCommands = {
     {
         "helpText": "Get the number of collections you own",
         "actionFunction": collectionCount,
+        "isDbAccessCommand": True
+    },
+    "GET_TOP_TEN":
+    {
+        "helpText": "See your top ten favorite movies according to your ratings",
+        "actionFunction": getTopTenMovies,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
