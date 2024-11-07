@@ -4,6 +4,7 @@ import datetime
 import re
 import random
 import string
+from hashlib import sha256
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
@@ -56,7 +57,6 @@ def createAccount(conn):
     utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime, salt))
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
-
 def login(conn):
     idPasswordQuery = "SELECT id, password, salt FROM users where username = %s"
     id = ""
@@ -74,23 +74,21 @@ def login(conn):
         if (packedIdPassword): # unpack if we got a user
             id = packedIdPassword[0][0]
             expectedPassword = packedIdPassword[0][1]
-            salt = packedIdPassword[0][1]
+            salt = packedIdPassword[0][2]
 
         # Check user existing
         if (id):
             break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
-
-    # for debugging, uncomment if you want to feel like a hacker
-    # print("\texpected password: " + expectedPassword) 
     
     hashedPassword = ""
     while (not (hashedPassword == expectedPassword)):
         password = input("\t(" + username + ") Enter your password: ")
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
-        hashedPassword = getHash(password, salt)
+        hashedPassword = getHash(password.strip(), salt)
+        print(hashedPassword)
     
     # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
@@ -108,7 +106,6 @@ def logout():
         print("*** You have logged out. Use LOGIN to login again ***")
     else:
         print("*** You need to LOGIN before you can LOGOUT ***")
-
 
 # Idea here is a user will search for another user, and take respective following action
 # We can also see others collections here, if we want to
@@ -159,7 +156,6 @@ def userSearch(conn):
             pass
     else:
         print("\tSorry, " + searchedEmail + " is not a member of MovieDB")
-
 
 def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
@@ -300,8 +296,6 @@ def watchCollection(conn):
         utils.exec_commit(conn, sql, (movie[2], utils.sessionToken, startTime, endTime))
         startTime = endTime
 
-
-
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
@@ -315,7 +309,6 @@ def formatMovieSearchOutput(conn, input):
         output[x].append(getMovieUserRating(conn, id))
     return output
         
-
 def formatArrayToTallString(array):
     outString = ""
     for x in array:
@@ -353,7 +346,6 @@ def createMovieCollection(conn):
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
 
-
 def startMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -368,7 +360,6 @@ def startMovie(conn):
     else:
         print("You cannot view a movie that does not exist.")
 
-
 def endMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -382,7 +373,6 @@ def endMovie(conn):
         utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
     else:
         print("You have not begun viewing this movie.")
-
 
 def rateMovie(conn):
     userId = utils.sessionToken
@@ -423,7 +413,6 @@ def changeCollectionName(conn):
             print("Collection name already exists please try a different name")
     else:
         print("*** Collection not found or is not yours ***")
-    
     
 def addMovieToCollection(conn):
     userId = utils.sessionToken
@@ -710,10 +699,12 @@ def saltAndHash(password):
     saltSize = 32
     salt = ''.join(random.choices(string.ascii_letters, k=saltSize))
 
-    hashedPassword = hash(salt[:16] + password + salt[16:])
     # Password is affixed with the first and second half of salt
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+
     return (hashedPassword, salt)
 
 # Get the expected password when we know the salt (for login)
 def getHash(password, salt):
-    return hash(salt[:16] + password + salt[16:])
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+    return hashedPassword
