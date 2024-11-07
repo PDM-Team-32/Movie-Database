@@ -2,13 +2,15 @@ import utils
 from tabulate import tabulate
 import datetime
 import re
+import random
+import string
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
 def createAccount(conn):
     print("Account Creation:")
 
-    ###### Get an unused username ######
+    # Get an unused username 
     while (True):
         username = input("\tProvide a Username: ")
         userCheckQuery = "SELECT username FROM users WHERE username = %s"
@@ -18,14 +20,13 @@ def createAccount(conn):
         else:
             break
     
-    ###### Get an email address ######
+    # Get an email address 
     email = input("\tProvide an email address: ")
     while (not re.match(r"^\S+@\S+\.\S+$", email)):
         print("***" + email + " is not a valid email address ***")
         email = input("\tProvide a valid email address: ")
     
-    ###### Get a valid password (see regex or passwordHelp) ######
-    # TODO hash + salt in phase 3    
+    # Get a valid password (see regex or passwordHelp)
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
@@ -37,28 +38,33 @@ def createAccount(conn):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
+    
+    # Valid password, lets salt and hash
+    hashResults = saltAndHash(password)
+    password = hashResults[0]
+    salt = hashResults[1]
 
-    ###### Get remaining info (we don't really care abt this stuff) ######
+    # Get remaining info (we don't really care abt this about validating these)
     fName = input("\tProvide a First Name: ")
     lName = input("\tProvide a Last Name: ")
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
-    ###### Insert the user into the DB ######
+    # Insert the user into the DB 
     sql = """INSERT INTO users 
-            (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
-            VALUES(%s, %s, %s, %s, %s, %s, %s)"""
-    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime))
+            (firstname, lastname, email, username, password, creationdate, lastaccessdate, salt) 
+            VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"""
+    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime, salt))
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
 
 def login(conn):
-    idPasswordQuery = "SELECT id, password FROM users where username = %s"
+    idPasswordQuery = "SELECT id, password, salt FROM users where username = %s"
     id = ""
     expectedPassword = ""
 
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
-    ###### Ensure the account exists ######
+    # Ensure the account exists
     while (True):
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
@@ -68,6 +74,7 @@ def login(conn):
         if (packedIdPassword): # unpack if we got a user
             id = packedIdPassword[0][0]
             expectedPassword = packedIdPassword[0][1]
+            salt = packedIdPassword[0][1]
 
         # Check user existing
         if (id):
@@ -78,18 +85,19 @@ def login(conn):
     # for debugging, uncomment if you want to feel like a hacker
     # print("\texpected password: " + expectedPassword) 
     
-    password = ""
-    while (not (password == expectedPassword)):
+    hashedPassword = ""
+    while (not (hashedPassword == expectedPassword)):
         password = input("\t(" + username + ") Enter your password: ")
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
+        hashedPassword = getHash(password, salt)
     
-    ###### Update lastaccessdate ######
+    # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
     utils.exec_commit(conn, datePrompt, (currentDatetime, id))
     
-    ###### User is now logged in ######
+    # User is now logged in
     print("Welcome back " + username)
     utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
@@ -696,7 +704,16 @@ def passwordHelp():
     print("contain no spaces")
     print("*******************************************************")
 
+# Return the hashed password and the salt
+def saltAndHash(password):
+    # Generates a random string of ascii letters of size 32 
+    saltSize = 32
+    salt = ''.join(random.choices(string.ascii_letters, k=saltSize))
 
-def salt():
-    # TODO dont forget to add salt to users table
-    print("SALT IS NOT IMPLEMENTED YET")
+    hashedPassword = hash(salt[:16] + password + salt[16:])
+    # Password is affixed with the first and second half of salt
+    return (hashedPassword, salt)
+
+# Get the expected password when we know the salt (for login)
+def getHash(password, salt):
+    return hash(salt[:16] + password + salt[16:])
