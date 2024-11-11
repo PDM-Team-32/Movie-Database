@@ -370,7 +370,7 @@ def getTopTenMovies(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
 
-def getTopTenMoviesAmongFollowers(conn):
+def getTopTwentyMoviesAmongFollowers(conn):
     userId = utils.sessionToken
     sql = """SELECT
                 m.title,
@@ -378,7 +378,7 @@ def getTopTenMoviesAmongFollowers(conn):
             FROM movie AS m
             INNER JOIN userwatchesmovie AS uwm
                 ON(uwm.movieid = m.id)
-            WHERE (uwm.userId IN (SELECT followinguserid FROM userfollowinguser WHERE followeduserid = 1 ))
+            WHERE (uwm.userId IN (SELECT followinguserid FROM userfollowinguser WHERE followeduserid = %s ))
             GROUP BY m.title
             ORDER BY views DESC, m.title ASC
             LIMIT 20;"""
@@ -692,7 +692,7 @@ cliCommands = {
     "FOLLOWER_FAVORITES":
     {
         "helpText": "See your top 20 favorite movies based on your followers watch history",
-        "actionFunction": getTopTenMoviesAmongFollowers,
+        "actionFunction": getTopTwentyMoviesAmongFollowers,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
