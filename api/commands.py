@@ -350,10 +350,10 @@ def recommendByML(conn):
                                     FROM userratesmovie AS urm_base
                                     INNER JOIN userRatesMovie AS urm
                                         ON(urm.movieid = urm_base.movieid)
-                                    WHERE (urm.userid != 1 AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = 1))
+                                    WHERE (urm.userid != %(inUserId)s AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = %(inUserId)s))
                 ORDER BY urm.starrating DESC;
                 """
-    similarUserWatchHistory = pandas.read_sql(sql, conn)
+    similarUserWatchHistory = pandas.read_sql_query(sql, conn, params={"inUserId": userId})
     titleless = similarUserWatchHistory.drop(['title'], axis=1)
     titles_only = similarUserWatchHistory['title']
 
@@ -390,11 +390,11 @@ def createLinearRegression(conn, userId):
                 ON(urm.movieid = m.id)
             INNER JOIN movieplatform AS mp
                 ON(mp.movieid = m.id)
-            WHERE  urm.userId = 1
+            WHERE  urm.userId = %(inUserId)s
             ORDER BY urm.starrating DESC
             LIMIT 300;
         """
-    userWatchHistory = pandas.read_sql(sql, conn)
+    userWatchHistory = pandas.read_sql_query(sql, conn, params={"inUserId":userId})
 
     x = userWatchHistory.drop(['starrating'], axis=1)
     y = userWatchHistory['starrating']
