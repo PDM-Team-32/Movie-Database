@@ -370,8 +370,23 @@ def getTopTenMovies(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
 
+def getTopTenMoviesAmongFollowers(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                COUNT(uwm.movieid) AS views
+            FROM movie AS m
+            INNER JOIN userwatchesmovie AS uwm
+                ON(uwm.movieid = m.id)
+            WHERE (uwm.userId IN (SELECT followinguserid FROM userfollowinguser WHERE followeduserid = 1 ))
+            GROUP BY m.title
+            ORDER BY views DESC, m.title ASC
+            LIMIT 20;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
 
-def reccomendedMovies(conn):
+
+def recommendedMovies(conn):
     userId = utils.sessionToken
     sql = """SELECT
                 m.title,
@@ -386,6 +401,23 @@ def reccomendedMovies(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
 
+
+def topNewReleases(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                COUNT(uwm.movieid) AS views
+            FROM movie AS m
+            INNER JOIN userwatchesmovie AS uwm
+                ON(uwm.movieid = m.id)
+            INNER JOIN movieplatform AS mp
+                ON(mp.movieid = m.id)
+            WHERE (mp.releasedate > current_date - interval '30' day)
+            GROUP BY m.title
+            ORDER BY views DESC, m.title ASC
+            LIMIT 5;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
 
 def startMovie(conn):
     userId = utils.sessionToken
@@ -642,13 +674,25 @@ cliCommands = {
     "RECOMMENDED_MOVIES":
     {
         "helpText": "View the top 20 most viewed movies in the last 90 days",
-        "actionFunction": reccomendedMovies,
+        "actionFunction": recommendedMovies,
+        "isDbAccessCommand": True
+    },
+    "NEW_RELEASES":
+    {
+        "helpText": "View the top 5 releases of this month",
+        "actionFunction": topNewReleases,
         "isDbAccessCommand": True
     },
     "GET_TOP_TEN":
     {
         "helpText": "See your top ten favorite movies according to your ratings",
         "actionFunction": getTopTenMovies,
+        "isDbAccessCommand": True
+    },
+    "FOLLOWER_FAVORITES":
+    {
+        "helpText": "See your top 20 favorite movies based on your followers watch history",
+        "actionFunction": getTopTenMoviesAmongFollowers,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
