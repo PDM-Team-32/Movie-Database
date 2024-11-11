@@ -356,6 +356,37 @@ def createMovieCollection(conn):
     utils.exec_commit(conn, sql, (userId, collectionName))
 
 
+def getTopTenMovies(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                urm.starrating
+            FROM movie AS m
+                INNER JOIN userRatesMovie AS urm
+            ON(urm.movieid = m.id)
+            WHERE  urm.userId = %s
+            ORDER BY urm.starrating DESC
+            LIMIT 10;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
+
+
+def reccomendedMovies(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                COUNT(uwm.movieid) AS views
+            FROM movie AS m
+            INNER JOIN userwatchesmovie AS uwm
+                ON(uwm.movieid = m.id)
+            WHERE (uwm.endtime > current_date - interval '90' day)
+            GROUP BY m.title
+            ORDER BY views DESC
+            LIMIT 20;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
+
+
 def startMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -606,6 +637,18 @@ cliCommands = {
     {
         "helpText": "Get the number of collections you own",
         "actionFunction": collectionCount,
+        "isDbAccessCommand": True
+    },
+    "RECOMMENDED_MOVIES":
+    {
+        "helpText": "View the top 20 most viewed movies in the last 90 days",
+        "actionFunction": reccomendedMovies,
+        "isDbAccessCommand": True
+    },
+    "GET_TOP_TEN":
+    {
+        "helpText": "See your top ten favorite movies according to your ratings",
+        "actionFunction": getTopTenMovies,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
