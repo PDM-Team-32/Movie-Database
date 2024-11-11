@@ -1,7 +1,15 @@
+import pandas
 import utils
 from tabulate import tabulate
 import datetime
 import re
+import numpy as np
+import matplotlib.pyplot as plt
+import sklearn as sk
+import seaborn as seaborn
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
@@ -158,6 +166,7 @@ def help():
     for key in cliCommands:
         print(key + ": " + cliCommands[key]["helpText"])
 
+
 def movieSearch(conn):
     searchArray = []
     sortByArray = []
@@ -244,6 +253,7 @@ def movieSearch(conn):
     else:
         print("No results found")
 
+
 def getMovieUserRating(conn, movieId):
     sql = """
     SELECT AVG(urm.starrating)::int
@@ -255,6 +265,7 @@ def getMovieUserRating(conn, movieId):
     if output == None:
         output = "No ratings"
     return output
+
 
 def makeOrderByString(array):
     if array[0] in orderByCommands["Selection"].keys():
@@ -268,6 +279,7 @@ def makeOrderByString(array):
         print("Invalid sort selection will default to movie name")
         qualifier = orderByCommands["Selection"]["A"]
     return(selection + " " + qualifier)
+
 
 def watchCollection(conn):
     collectionName = (input("Give the name of the collection you want to watch: "))
@@ -293,7 +305,6 @@ def watchCollection(conn):
         startTime = endTime
 
 
-
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
@@ -313,6 +324,85 @@ def formatArrayToTallString(array):
     for x in array:
         outString += x + "\n"
     return outString
+
+def recommendByML(conn):
+    userId = utils.sessionToken
+    linReg = createLinearRegression(conn, userId)
+    
+    # This will get a list of movies from "similar users" meaning they rated movies similarly in the past
+    sql = """
+            SELECT
+                m.title,
+                mp.platformid AS platform,
+                (SELECT mg.genreid
+                        FROM moviegenre AS mg
+                        WHERE(m.id = mg.movieid) LIMIT 1) AS genres,
+                (SELECT cd.castId
+                        FROM castdirects AS cd
+                        WHERE(cd.movieid = m.id) LIMIT 1) AS directors
+                FROM movie AS m
+                INNER JOIN userRatesMovie AS urm
+                    ON(urm.movieid = m.id)
+                INNER JOIN movieplatform AS mp
+                    ON(mp.movieid = m.id)
+                WHERE  urm.userId IN (SELECT
+                                        urm.userid
+                                    FROM userratesmovie AS urm_base
+                                    INNER JOIN userRatesMovie AS urm
+                                        ON(urm.movieid = urm_base.movieid)
+                                    WHERE (urm.userid != 1 AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = 1))
+                ORDER BY urm.starrating DESC;
+                """
+    similarUserWatchHistory = pandas.read_sql(sql, conn)
+    titleless = similarUserWatchHistory.drop(['title'], axis=1)
+    titles_only = similarUserWatchHistory['title']
+
+    predictions = linReg.predict(titleless)
+
+    predictions, titles_only = zip(*sorted(zip(predictions, titles_only)))
+    predictions = list(predictions)[::-1]
+    reversed = list(titles_only)[::-1]
+
+    filtered = []
+    x = 5
+    counter = 0
+    while x > 3.5 and counter < len(predictions):
+        x = predictions[counter]
+        filtered.append([reversed[counter]])
+        counter += 1
+    print(tabulate(filtered, headers=["Title"], tablefmt='grid'))
+
+
+def createLinearRegression(conn, userId):
+# This query is gross and I hate it. The LIMIT 1s are bc sklearn cant take an array
+    sql = """
+            SELECT
+            urm.starrating,
+            mp.platformid AS platform,
+            (SELECT mg.genreid
+                    FROM moviegenre AS mg
+                    WHERE(m.id = mg.movieid) LIMIT 1) AS genres,
+            (SELECT cd.castId
+                    FROM castdirects AS cd
+                    WHERE(cd.movieid = m.id) LIMIT 1) AS directors
+            FROM movie AS m
+            INNER JOIN userRatesMovie AS urm
+                ON(urm.movieid = m.id)
+            INNER JOIN movieplatform AS mp
+                ON(mp.movieid = m.id)
+            WHERE  urm.userId = 1
+            ORDER BY urm.starrating DESC
+            LIMIT 300;
+        """
+    userWatchHistory = pandas.read_sql(sql, conn)
+
+    x = userWatchHistory.drop(['starrating'], axis=1)
+    y = userWatchHistory['starrating']
+    # Assign test and training data
+    x_train, x_test, y_train, y_test = train_test_split(x, y, train_size = 0.99, random_state = 123)
+    LR = LinearRegression()
+    LR.fit(x_train, y_train)
+    return LR
 
 def collectionCount(conn):
     userId = utils.sessionToken
@@ -343,6 +433,7 @@ def viewCollections(conn):
         if movies[x][2] == None:
             movies[x] = [movies[x][0], movies[x][1], "00:00"]
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
+
 
 def createMovieCollection(conn):
     userId = utils.sessionToken
@@ -378,7 +469,7 @@ def getTopTenMoviesAmongFollowers(conn):
             FROM movie AS m
             INNER JOIN userwatchesmovie AS uwm
                 ON(uwm.movieid = m.id)
-            WHERE (uwm.userId IN (SELECT followinguserid FROM userfollowinguser WHERE followeduserid = 1 ))
+            WHERE (uwm.userId IN (SELECT followinguserid FROM userfollowinguser WHERE followeduserid = %s ))
             GROUP BY m.title
             ORDER BY views DESC, m.title ASC
             LIMIT 20;"""
@@ -398,7 +489,7 @@ def recommendedMovies(conn):
             GROUP BY m.title
             ORDER BY views DESC
             LIMIT 20;"""
-    movies = utils.exec_get_all(conn, sql, (userId,))
+    movies = utils.exec_get_all(conn, sql)
     print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
 
 
@@ -699,6 +790,12 @@ cliCommands = {
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "RECOMMEND_MOVIE_WITH_ML" :
+    {
+        "helpText": "Use our ML model to recommend you movies based on your historic watch data",
+        "actionFunction": recommendByML,
         "isDbAccessCommand": True
     },
     "START_MOVIE" :
