@@ -371,6 +371,21 @@ def getTopTenMovies(conn):
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
 
 
+def reccomendedMovies(conn):
+    userId = utils.sessionToken
+    sql = """SELECT
+                m.title,
+                COUNT(uwm.movieid) AS views
+            FROM movie AS m
+            INNER JOIN userwatchesmovie AS uwm
+                ON(uwm.movieid = m.id)
+            WHERE (uwm.endtime > current_date - interval '90' day)
+            GROUP BY m.title
+            ORDER BY views DESC
+            LIMIT 20;"""
+    movies = utils.exec_get_all(conn, sql, (userId,))
+    print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
+
 
 def startMovie(conn):
     userId = utils.sessionToken
@@ -622,6 +637,12 @@ cliCommands = {
     {
         "helpText": "Get the number of collections you own",
         "actionFunction": collectionCount,
+        "isDbAccessCommand": True
+    },
+    "RECOMMENDED_MOVIES":
+    {
+        "helpText": "View the top 20 most viewed movies in the last 90 days",
+        "actionFunction": reccomendedMovies,
         "isDbAccessCommand": True
     },
     "GET_TOP_TEN":
