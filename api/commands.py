@@ -2,13 +2,16 @@ import utils
 from tabulate import tabulate
 import datetime
 import re
+import random
+import string
+from hashlib import sha256
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
 def createAccount(conn):
     print("Account Creation:")
 
-    ###### Get an unused username ######
+    # Get an unused username 
     while (True):
         username = input("\tProvide a Username: ")
         userCheckQuery = "SELECT username FROM users WHERE username = %s"
@@ -18,14 +21,13 @@ def createAccount(conn):
         else:
             break
     
-    ###### Get an email address ######
+    # Get an email address 
     email = input("\tProvide an email address: ")
     while (not re.match(r"^\S+@\S+\.\S+$", email)):
         print("***" + email + " is not a valid email address ***")
         email = input("\tProvide a valid email address: ")
     
-    ###### Get a valid password (see regex or passwordHelp) ######
-    # TODO hash + salt in phase 3    
+    # Get a valid password (see regex or passwordHelp)
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
@@ -37,28 +39,32 @@ def createAccount(conn):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
+    
+    # Valid password, lets salt and hash
+    hashResults = saltAndHash(password)
+    password = hashResults[0]
+    salt = hashResults[1]
 
-    ###### Get remaining info (we don't really care abt this stuff) ######
+    # Get remaining info (we don't really care abt this about validating these)
     fName = input("\tProvide a First Name: ")
     lName = input("\tProvide a Last Name: ")
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
-    ###### Insert the user into the DB ######
+    # Insert the user into the DB 
     sql = """INSERT INTO users 
-            (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
-            VALUES(%s, %s, %s, %s, %s, %s, %s)"""
-    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime))
+            (firstname, lastname, email, username, password, creationdate, lastaccessdate, salt) 
+            VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"""
+    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime, salt))
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
-
 def login(conn):
-    idPasswordQuery = "SELECT id, password FROM users where username = %s"
+    idPasswordQuery = "SELECT id, password, salt FROM users where username = %s"
     id = ""
     expectedPassword = ""
 
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
-    ###### Ensure the account exists ######
+    # Ensure the account exists
     while (True):
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
@@ -68,28 +74,27 @@ def login(conn):
         if (packedIdPassword): # unpack if we got a user
             id = packedIdPassword[0][0]
             expectedPassword = packedIdPassword[0][1]
+            salt = packedIdPassword[0][2]
 
         # Check user existing
         if (id):
             break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
-
-    # for debugging, uncomment if you want to feel like a hacker
-    # print("\texpected password: " + expectedPassword) 
     
-    password = ""
-    while (not (password == expectedPassword)):
+    hashedPassword = ""
+    while (not (hashedPassword == expectedPassword)):
         password = input("\t(" + username + ") Enter your password: ")
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
+        hashedPassword = getHash(password.strip(), salt)
     
-    ###### Update lastaccessdate ######
+    # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
     utils.exec_commit(conn, datePrompt, (currentDatetime, id))
     
-    ###### User is now logged in ######
+    # User is now logged in
     print("Welcome back " + username)
     utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
@@ -100,7 +105,6 @@ def logout():
         print("*** You have logged out. Use LOGIN to login again ***")
     else:
         print("*** You need to LOGIN before you can LOGOUT ***")
-
 
 # Idea here is a user will search for another user, and take respective following action
 # We can also see others collections here, if we want to
@@ -151,7 +155,6 @@ def userSearch(conn):
             pass
     else:
         print("\tSorry, " + searchedEmail + " is not a member of MovieDB")
-
 
 def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
@@ -292,8 +295,6 @@ def watchCollection(conn):
         utils.exec_commit(conn, sql, (movie[2], utils.sessionToken, startTime, endTime))
         startTime = endTime
 
-
-
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
@@ -307,7 +308,6 @@ def formatMovieSearchOutput(conn, input):
         output[x].append(getMovieUserRating(conn, id))
     return output
         
-
 def formatArrayToTallString(array):
     outString = ""
     for x in array:
@@ -355,7 +355,6 @@ def createMovieCollection(conn):
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
 
-
 def getTopTenMovies(conn):
     userId = utils.sessionToken
     sql = """SELECT
@@ -369,7 +368,6 @@ def getTopTenMovies(conn):
             LIMIT 10;"""
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
-
 
 def reccomendedMovies(conn):
     userId = utils.sessionToken
@@ -386,7 +384,6 @@ def reccomendedMovies(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
 
-
 def startMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -401,7 +398,6 @@ def startMovie(conn):
     else:
         print("You cannot view a movie that does not exist.")
 
-
 def endMovie(conn):
     userId = utils.sessionToken
     movieId = input("Enter the ID of your movie: ")
@@ -415,7 +411,6 @@ def endMovie(conn):
         utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
     else:
         print("You have not begun viewing this movie.")
-
 
 def rateMovie(conn):
     userId = utils.sessionToken
@@ -456,7 +451,6 @@ def changeCollectionName(conn):
             print("Collection name already exists please try a different name")
     else:
         print("*** Collection not found or is not yours ***")
-    
     
 def addMovieToCollection(conn):
     userId = utils.sessionToken
@@ -755,7 +749,18 @@ def passwordHelp():
     print("contain no spaces")
     print("*******************************************************")
 
+# Return the hashed password and the salt
+def saltAndHash(password):
+    # Generates a random string of ascii letters of size 32 
+    saltSize = 32
+    salt = ''.join(random.choices(string.ascii_letters, k=saltSize))
 
-def salt():
-    # TODO dont forget to add salt to users table
-    print("SALT IS NOT IMPLEMENTED YET")
+    # Password is affixed with the first and second half of salt
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+
+    return (hashedPassword, salt)
+
+# Get the expected password when we know the salt (for login)
+def getHash(password, salt):
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+    return hashedPassword
