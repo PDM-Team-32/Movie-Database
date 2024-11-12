@@ -88,7 +88,6 @@ def login(conn):
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
         hashedPassword = getHash(password.strip(), salt)
-        print(hashedPassword)
     
     # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
