@@ -98,7 +98,6 @@ def login(conn):
     print("Welcome back " + username)
     utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
-# TODO this needs to become a connected function to store sessionToken in DB
 def logout():
     if (utils.sessionToken > 0):
         utils.sessionToken = -1
@@ -107,7 +106,7 @@ def logout():
         print("*** You need to LOGIN before you can LOGOUT ***")
 
 # Idea here is a user will search for another user, and take respective following action
-# We can also see others collections here, if we want to
+# Display the users following counts
 def userSearch(conn):
     searchedEmail = input("\tPlease input an email to search: ")
 
@@ -132,6 +131,23 @@ def userSearch(conn):
             followingString = "not following"
             actionString = "follow"
         print("\tYou are " + followingString + " " + searchedEmail)
+
+        # Get the following/follower count
+        followingCountSql = """
+                        SELECT COUNT(ufu.followinguserid)
+                        FROM userfollowinguser as ufu
+                        WHERE ufu.followinguserid = %s"""
+        
+        followersCountSql = """
+                        SELECT COUNT(ufu.followeduserid)
+                        FROM userfollowinguser as ufu
+                        WHERE ufu.followeduserid = %s"""
+        
+        # TODO error check these
+        followingCount = utils.exec_get_one(conn, followingCountSql, (utils.sessionToken,))[0]
+        followedCount = utils.exec_get_one(conn, followersCountSql, (utils.sessionToken,))[0]
+
+        print("\tThey are following " + followingCount + " accounts and are followed by " + followedCount + " account.")
 
         # get a valid input
         while (True):
