@@ -639,7 +639,7 @@ cliCommands = {
         "actionFunction": movieSearch,
         "isDbAccessCommand": True
     },
-    "USER_INFO":
+    "MY_INFO":
     {
         "helpText": "Get the number of collections you own, as well as follower and following counts",
         "actionFunction": userInfo,
