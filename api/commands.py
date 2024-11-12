@@ -390,31 +390,21 @@ def startMovie(conn):
     if movieId == -1:
         return
     
-    sql = """SELECT title FROM movie WHERE movie.id = %s"""
-    movie = utils.exec_get_one(conn, sql, (movieId,))
-
-    if movie:
-        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
-        sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
-        utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
-    else:
-        print("You cannot view a movie that does not exist.")
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
+    utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
+    print("Started")
 
 def endMovie(conn):
     userId = utils.sessionToken
-    mmovieId = getMovieID(conn, "Title of movie to end ")
+    movieId = getMovieID(conn, "Title of movie to end ")
     if movieId == -1:
         return
 
-    sql = """SELECT startTime FROM userWatchesMovie AS uwm WHERE uwm.userId = %s AND uwm.movieId = %s"""
-    movie = utils.exec_get_one(conn, sql, (userId, movieId))
-
-    if movie:
-        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
-        sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
-        utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
-    else:
-        print("You have not begun viewing this movie.")
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
+    utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
+    print("Ended")
 
 def rateMovie(conn):
     userId = utils.sessionToken
@@ -423,24 +413,32 @@ def rateMovie(conn):
         if movieId == -1:
             return
     
-        sql = """SELECT title
-            FROM movie AS m
-            WHERE m.id = %s AND m.id IN (SELECT movieid
-                                        FROM userwatchesmovie
-                                        WHERE  userid = %s AND movieid NOT IN (SELECT movieid
-                                                                            FROM userratesmovie
-                                                                            WHERE userid = %s))"""
-        movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken, utils.sessionToken))
-
-        if movie:
-            rating = input("Enter a star rating from 1 to 5: ")
-            if int(rating) < 1 or int(rating) > 5:
-                print("Invalid rating.")
+        sql = """SELECT *
+            FROM userwatchesmovie AS W
+            WHERE W.UserID = %s AND W.MovieID = %s""" 
+        
+        sq2 = """SELECT starrating
+            FROM userratesmovie AS r
+            WHERE r.UserID = %s AND r.MovieID = %s"""
+        
+        check = utils.exec_get_one(conn, sql, (userId, movieId,))
+        if check:
+            check2 = utils.exec_get_one(conn, sq2, (userId, movieId,))
+            if not check2:
+                rating = input("Enter a star rating from 1 to 5: ")
+                try:
+                    if int(rating) in range(1,5):
+                        sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
+                        utils.exec_commit(conn, sql, (movieId, userId, rating))
+                        print("Rated.")
+                    else:
+                        print("Invalid rating.")
+                except Exception:
+                    print("Invalid rating.")
             else:
-                sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
-                utils.exec_commit(conn, sql, (movieId, userId, rating))
+                print("You cannot rate a movie that you have already rated.")
         else:
-            print("You cannot rate a movie that does not exist or that you have already rated.")
+            print("You cannot rate a movie that you have not watch.")
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
