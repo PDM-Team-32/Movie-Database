@@ -386,8 +386,10 @@ def reccomendedMovies(conn):
 
 def startMovie(conn):
     userId = utils.sessionToken
-    movieId = input("Enter the ID of your movie: ")
-
+    movieId = getMovieID(conn, "Title of movie to watch ")
+    if movieId == -1:
+        return
+    
     sql = """SELECT title FROM movie WHERE movie.id = %s"""
     movie = utils.exec_get_one(conn, sql, (movieId,))
 
@@ -400,7 +402,9 @@ def startMovie(conn):
 
 def endMovie(conn):
     userId = utils.sessionToken
-    movieId = input("Enter the ID of your movie: ")
+    mmovieId = getMovieID(conn, "Title of movie to end ")
+    if movieId == -1:
+        return
 
     sql = """SELECT startTime FROM userWatchesMovie AS uwm WHERE uwm.userId = %s AND uwm.movieId = %s"""
     movie = utils.exec_get_one(conn, sql, (userId, movieId))
@@ -414,30 +418,29 @@ def endMovie(conn):
 
 def rateMovie(conn):
     userId = utils.sessionToken
-    print("*** Type QUIT to stop ***")
-    while (True):
-        movieId = input("Enter the ID of the movie to rate: ")
-        if collectionName.casefold() == "QUIT".casefold():
-            return   
+    while(True):
+        movieId = getMovieID(conn, "Title of movie to rate ")
+        if movieId == -1:
+            return
     
-    sql = """SELECT title
+        sql = """SELECT title
             FROM movie AS m
             WHERE m.id = %s AND m.id IN (SELECT movieid
                                         FROM userwatchesmovie
                                         WHERE  userid = %s AND movieid NOT IN (SELECT movieid
                                                                             FROM userratesmovie
                                                                             WHERE userid = %s))"""
-    movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken, utils.sessionToken))
+        movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken, utils.sessionToken))
 
-    if movie:
-        rating = input("Enter a star rating from 1 to 5: ")
-        if int(rating) < 1 or int(rating) > 5:
-            print("Invalid rating.")
+        if movie:
+            rating = input("Enter a star rating from 1 to 5: ")
+            if int(rating) < 1 or int(rating) > 5:
+                print("Invalid rating.")
+            else:
+                sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
+                utils.exec_commit(conn, sql, (movieId, userId, rating))
         else:
-            sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
-            utils.exec_commit(conn, sql, (movieId, userId, rating))
-    else:
-        print("You cannot rate a movie that does not exist or that you have already rated.")
+            print("You cannot rate a movie that does not exist or that you have already rated.")
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
@@ -458,66 +461,31 @@ def changeCollectionName(conn):
     
 def addMovieToCollection(conn):
     userId = utils.sessionToken
-    print("*** Type QUIT to stop ***")
+    userId = utils.sessionToken
+    collectionId = getCollectionID(conn, "Name of collection: ")
+    if collectionId == -1:
+        return  
     while (True):
-        collectionName = input("Name of collection: ")
-        if collectionName.casefold() == "QUIT".casefold():
-            return       
-        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
-        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
-        if (results):
-            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
-            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
-            if(collectionId):
-                break
-            else:
-                print("*** You Do Not Own That Collection ***")
-        else:
-            print("*** Collection not found ***")
-    while (True):
-        print("*** Type QUIT to stop ***")
-        movieTitle = input("Title of movie: ")
-        if movieTitle.casefold() == "QUIT".casefold():
-            return       
-        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
-        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
-        if (movieId):
-            if len(movieId)>1:
-                for i in range(len(movieId)):
-                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
-                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
-                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
-                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
-                    print(f"{i} {movie[0]} {format(date[0])}")
-                index = -1
-                while(index<0 or index>(len(movieId))):
-                    index = input("Enter the number of the movie you want: ")
-                    try:
-                        index = int(index)
-                    except ValueError:
-                        index = -1
-                        print("*** Invalid number ***")
-            else:
-                index = 0
-            try:
-                insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
-                utils.exec_commit(conn, insert, (movieId[index], collectionId,))
-            except Exception:
-                curs = conn.cursor()
-                curs.execute("ROLLBACK")
-                conn.commit()
-                print("*** Already in collection ***")
-        else:
-            print("*** Movie not found ***")
+        movieId = getMovieID(conn, "Title of movie: ")
+        if movieId == -1:
+            return
+        try:
+            insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
+            utils.exec_commit(conn, insert, (movieId, collectionId,))
+        except Exception:
+            curs = conn.cursor()
+            curs.execute("ROLLBACK")
+            conn.commit()
+            print("*** Already in collection ***")
 
 def removeMovieFromCollection(conn):
     userId = utils.sessionToken
-    collectionID = getCollectionID
-    if collectionID == -1:
+    collectionId = getCollectionID(conn, "Name of collection: ")
+    if collectionId == -1:
         return   
     while (True):
-        movieID = getMovieID
-        if movieID == -1:
+        movieId = getMovieID(conn, "Title of movie: ")
+        if movieId == -1:
             return
         movieCheckQuery = "SELECT MovieId FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
         results = utils.exec_get_one(conn, movieCheckQuery, (movieId, collectionId,))
@@ -528,11 +496,11 @@ def removeMovieFromCollection(conn):
         else:
             print("*** Movie not in Collection ***")
 
-def getCollectionID(conn):
+def getCollectionID(conn , message):
     userId = utils.sessionToken
     print("*** Type QUIT to stop ***")
     while (True):
-        collectionName = input("Name of collection: ")
+        collectionName = input(message)
         if collectionName.casefold() == "QUIT".casefold():
             return -1    
         collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
@@ -547,7 +515,7 @@ def getCollectionID(conn):
         else:
             print("*** Collection not found ***")
 
-def getMovieID(conn):
+def getMovieID(conn, message):
     print("*** Type QUIT to stop ***")
     while (True):
         movieTitle = input("Title of movie: ")
@@ -571,7 +539,7 @@ def getMovieID(conn):
                     except ValueError:
                         index = -1
                         print("*** Invalid number ***")
-                    return movieId[index]
+                return movieId[index]
             else:
                 return movieId[0]
         else:
