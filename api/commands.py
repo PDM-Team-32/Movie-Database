@@ -314,14 +314,27 @@ def formatArrayToTallString(array):
         outString += x + "\n"
     return outString
 
-def collectionCount(conn):
+def userInfo(conn):
     userId = utils.sessionToken
-    sql = """SELECT
+    collectionSql = """SELECT
                 COUNT(umc.name)
             FROM userMovieCollection AS umc
             WHERE  userId = %s;"""
-    count = utils.exec_get_one(conn, sql, (userId,))
+    followingCountSql = """
+                        SELECT COUNT(followinguserid)
+                        FROM userfollowinguser
+                        WHERE followinguserid = %s"""
+
+    followersCountSql = """
+                    SELECT COUNT(followeduserid)
+                    FROM userfollowinguser
+                    WHERE followeduserid = %s"""        
+    count = utils.exec_get_one(conn, collectionSql, (userId,))
+    followingCount = str(utils.exec_get_one(conn, followingCountSql, (userId,))[0])
+    followedCount = str(utils.exec_get_one(conn, followersCountSql, (userId,))[0])
+    
     print("You have " + str(count[0]) + " collections!")
+    print("You are following " + followingCount + " accounts and are followed by " + followedCount + " accounts!")
 
 
 def viewCollections(conn):
@@ -588,7 +601,6 @@ def deleteCollection(conn):
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
 
-
 # This must be at the bottom of this file so that the functions are declared before assignment.
 cliCommands = {
     "CREATE_ACCOUNT": 
@@ -627,10 +639,10 @@ cliCommands = {
         "actionFunction": movieSearch,
         "isDbAccessCommand": True
     },
-    "COLLECTION_COUNT":
+    "USER_INFO":
     {
-        "helpText": "Get the number of collections you own",
-        "actionFunction": collectionCount,
+        "helpText": "Get the number of collections you own, as well as follower and following counts",
+        "actionFunction": userInfo,
         "isDbAccessCommand": True
     },
     "RECOMMENDED_MOVIES":
