@@ -123,7 +123,7 @@ def userSearch(conn):
         # search for the userID and determine following state
         followingQuery = """SELECT followeduserid FROM userfollowinguser WHERE
                             followinguserid = %s and followeduserid = %s"""
-        followingId = utils.exec_get_all(conn, followingQuery, (utils.sessionToken, searchedUserId))
+        followingId = utils.exec_get_one(conn, followingQuery, (utils.sessionToken, searchedUserId))
         if (followingId):
             followingString = "following"
             actionString = "unfollow"
@@ -134,20 +134,19 @@ def userSearch(conn):
 
         # Get the following/follower count
         followingCountSql = """
-                        SELECT COUNT(ufu.followinguserid)
-                        FROM userfollowinguser as ufu
-                        WHERE ufu.followinguserid = %s"""
+                        SELECT COUNT(followinguserid)
+                        FROM userfollowinguser
+                        WHERE followinguserid = %s"""
         
         followersCountSql = """
-                        SELECT COUNT(ufu.followeduserid)
-                        FROM userfollowinguser as ufu
-                        WHERE ufu.followeduserid = %s"""
-        
-        # TODO error check these
-        followingCount = utils.exec_get_one(conn, followingCountSql, (utils.sessionToken,))[0]
-        followedCount = utils.exec_get_one(conn, followersCountSql, (utils.sessionToken,))[0]
+                        SELECT COUNT(followeduserid)
+                        FROM userfollowinguser
+                        WHERE followeduserid = %s"""
+                
+        followingCount = str(utils.exec_get_one(conn, followingCountSql, (searchedUserId,))[0])
+        followedCount = str(utils.exec_get_one(conn, followersCountSql, (searchedUserId,))[0])
 
-        print("\tThey are following " + followingCount + " accounts and are followed by " + followedCount + " account.")
+        print("\tThey are following " + followingCount + " accounts and are followed by " + followedCount + " accounts.")
 
         # get a valid input
         while (True):
