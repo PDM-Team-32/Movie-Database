@@ -39,7 +39,12 @@ def createAccount(conn):
             if (not bool(re.match(r"^\S+@\S+\.\S+$", email))):
                 print("***" + email + " is not a valid email address ***")
             else:
-                break
+                emailCheckSql = "SELECT email FROM users WHERE email = %s"
+                results = utils.exec_get_one(conn, emailCheckSql, (email,))
+                if (results):
+                    print("*** That email is taken! ***")
+                else:
+                    break
         attempts += 1
 
     if (attempts == 20):
