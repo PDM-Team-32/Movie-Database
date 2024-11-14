@@ -2,13 +2,16 @@ import utils
 from tabulate import tabulate
 import datetime
 import re
+import random
+import string
+from hashlib import sha256
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
 def createAccount(conn):
     print("Account Creation:")
 
-    ###### Get an unused username ######
+    # Get an unused username 
     while (True):
         username = input("\tProvide a Username: ")
         userCheckQuery = "SELECT username FROM users WHERE username = %s"
@@ -18,14 +21,13 @@ def createAccount(conn):
         else:
             break
     
-    ###### Get an email address ######
+    # Get an email address 
     email = input("\tProvide an email address: ")
     while (not re.match(r"^\S+@\S+\.\S+$", email)):
         print("***" + email + " is not a valid email address ***")
         email = input("\tProvide a valid email address: ")
     
-    ###### Get a valid password (see regex or passwordHelp) ######
-    # TODO hash + salt in phase 3    
+    # Get a valid password (see regex or passwordHelp)
     passwordHelp()
     password = str(input("\tProvide a Password: "))
     while (not (
@@ -37,28 +39,32 @@ def createAccount(conn):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
+    
+    # Valid password, lets salt and hash
+    hashResults = saltAndHash(password)
+    password = hashResults[0]
+    salt = hashResults[1]
 
-    ###### Get remaining info (we don't really care abt this stuff) ######
+    # Get remaining info (we don't really care abt this about validating these)
     fName = input("\tProvide a First Name: ")
     lName = input("\tProvide a Last Name: ")
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
-    ###### Insert the user into the DB ######
+    # Insert the user into the DB 
     sql = """INSERT INTO users 
-            (firstname, lastname, email, username, password, creationdate, lastaccessdate) 
-            VALUES(%s, %s, %s, %s, %s, %s, %s)"""
-    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime))
+            (firstname, lastname, email, username, password, creationdate, lastaccessdate, salt) 
+            VALUES(%s, %s, %s, %s, %s, %s, %s, %s)"""
+    utils.exec_commit(conn, sql, (fName, lName, email, username, password, currentDatetime, currentDatetime, salt))
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
-
 def login(conn):
-    idPasswordQuery = "SELECT id, password FROM users where username = %s"
+    idPasswordQuery = "SELECT id, password, salt FROM users where username = %s"
     id = ""
     expectedPassword = ""
 
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
-    ###### Ensure the account exists ######
+    # Ensure the account exists
     while (True):
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
@@ -68,32 +74,30 @@ def login(conn):
         if (packedIdPassword): # unpack if we got a user
             id = packedIdPassword[0][0]
             expectedPassword = packedIdPassword[0][1]
+            salt = packedIdPassword[0][2]
 
         # Check user existing
         if (id):
             break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
-
-    # for debugging, uncomment if you want to feel like a hacker
-    # print("\texpected password: " + expectedPassword) 
     
-    password = ""
-    while (not (password == expectedPassword)):
+    hashedPassword = ""
+    while (not (hashedPassword == expectedPassword)):
         password = input("\t(" + username + ") Enter your password: ")
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
+        hashedPassword = getHash(password.strip(), salt)
     
-    ###### Update lastaccessdate ######
+    # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
     utils.exec_commit(conn, datePrompt, (currentDatetime, id))
     
-    ###### User is now logged in ######
+    # User is now logged in
     print("Welcome back " + username)
     utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
-# TODO this needs to become a connected function to store sessionToken in DB
 def logout():
     if (utils.sessionToken > 0):
         utils.sessionToken = -1
@@ -101,9 +105,8 @@ def logout():
     else:
         print("*** You need to LOGIN before you can LOGOUT ***")
 
-
 # Idea here is a user will search for another user, and take respective following action
-# We can also see others collections here, if we want to
+# Display the users following counts
 def userSearch(conn):
     searchedEmail = input("\tPlease input an email to search: ")
 
@@ -120,7 +123,7 @@ def userSearch(conn):
         # search for the userID and determine following state
         followingQuery = """SELECT followeduserid FROM userfollowinguser WHERE
                             followinguserid = %s and followeduserid = %s"""
-        followingId = utils.exec_get_all(conn, followingQuery, (utils.sessionToken, searchedUserId))
+        followingId = utils.exec_get_one(conn, followingQuery, (utils.sessionToken, searchedUserId))
         if (followingId):
             followingString = "following"
             actionString = "unfollow"
@@ -128,6 +131,22 @@ def userSearch(conn):
             followingString = "not following"
             actionString = "follow"
         print("\tYou are " + followingString + " " + searchedEmail)
+
+        # Get the following/follower count
+        followingCountSql = """
+                        SELECT COUNT(followinguserid)
+                        FROM userfollowinguser
+                        WHERE followinguserid = %s"""
+        
+        followersCountSql = """
+                        SELECT COUNT(followeduserid)
+                        FROM userfollowinguser
+                        WHERE followeduserid = %s"""
+                
+        followingCount = str(utils.exec_get_one(conn, followingCountSql, (searchedUserId,))[0])
+        followedCount = str(utils.exec_get_one(conn, followersCountSql, (searchedUserId,))[0])
+
+        print("\tThey are following " + followingCount + " accounts and are followed by " + followedCount + " accounts.")
 
         # get a valid input
         while (True):
@@ -151,7 +170,6 @@ def userSearch(conn):
             pass
     else:
         print("\tSorry, " + searchedEmail + " is not a member of MovieDB")
-
 
 def help():
     print("*** COMMAND LINE INTERFACE MENU ***")
@@ -241,7 +259,7 @@ def movieSearch(conn):
     output = utils.exec_get_all(conn, sql, tuple(searchArray))
     if (output): # if there are no results and we get a blank array, tabulate crashes
         formatted = formatMovieSearchOutput(conn, output)
-        print(tabulate(formatted, headers=["ID", "Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
+        print(tabulate(formatted, headers=["Title", "Length", "Rating", "Release Date", "Genre", "Platform", "Actors", "Directors", "Studio", "Star Rating"], tablefmt='grid', maxcolwidths=[None, 13]))
     else:
         print("No results found")
 
@@ -300,22 +318,22 @@ def watchCollection(conn):
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
-        # id = output[x][0] # get the id 
-        # output[x] = list(output[x][1:]) # kill the id for outputting
-        #output[x][4] = formatArrayToTallString(output[x][4])
+        id = output[x][0] # get the id 
+        output[x] = list(output[x][1:]) # kill the id for outputting
+        output[x][4] = formatArrayToTallString(output[x][4])
         output[x][5] = formatArrayToTallString(output[x][5])
         output[x][6] = formatArrayToTallString(output[x][6])
         output[x][7] = formatArrayToTallString(output[x][7])
-        output[x][8] = formatArrayToTallString(output[x][8])
+        # output[x][8] = formatArrayToTallString(output[x][8])
         output[x].append(getMovieUserRating(conn, id))
     return output
         
-
 def formatArrayToTallString(array):
     outString = ""
     for x in array:
         outString += x + "\n"
     return outString
+
 
 def recommendBySimilarUsers(conn):
     userId = utils.sessionToken
@@ -357,14 +375,27 @@ def recommendBySimilarUsers(conn):
     print(tabulate(movies, headers=["Title"], tablefmt='orgtbl'))
 
 
-def collectionCount(conn):
+def userInfo(conn):
     userId = utils.sessionToken
-    sql = """SELECT
+    collectionSql = """SELECT
                 COUNT(umc.name)
             FROM userMovieCollection AS umc
             WHERE  userId = %s;"""
-    count = utils.exec_get_one(conn, sql, (userId,))
+    followingCountSql = """
+                        SELECT COUNT(followinguserid)
+                        FROM userfollowinguser
+                        WHERE followinguserid = %s"""
+
+    followersCountSql = """
+                    SELECT COUNT(followeduserid)
+                    FROM userfollowinguser
+                    WHERE followeduserid = %s"""        
+    count = utils.exec_get_one(conn, collectionSql, (userId,))
+    followingCount = str(utils.exec_get_one(conn, followingCountSql, (userId,))[0])
+    followedCount = str(utils.exec_get_one(conn, followersCountSql, (userId,))[0])
+    
     print("You have " + str(count[0]) + " collections!")
+    print("You are following " + followingCount + " accounts and are followed by " + followedCount + " accounts!")
 
 
 def viewCollections(conn):
@@ -399,7 +430,6 @@ def createMovieCollection(conn):
     sql = """INSERT INTO userMovieCollection (userId, name) VALUES (%s, %s)"""
     utils.exec_commit(conn, sql, (userId, collectionName))
 
-
 def getTopTenMovies(conn):
     userId = utils.sessionToken
     sql = """SELECT
@@ -414,7 +444,7 @@ def getTopTenMovies(conn):
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
 
-def getTopTenMoviesAmongFollowers(conn):
+def getTopTwentyMoviesAmongFollowers(conn):
     userId = utils.sessionToken
     sql = """SELECT
                 m.title,
@@ -428,7 +458,6 @@ def getTopTenMoviesAmongFollowers(conn):
             LIMIT 20;"""
     movies = utils.exec_get_all(conn, sql, (userId,))
     print(tabulate(movies, headers=["Title", "Rating"], tablefmt='grid'))
-
 
 def recommendedMovies(conn):
     userId = utils.sessionToken
@@ -444,7 +473,6 @@ def recommendedMovies(conn):
             LIMIT 20;"""
     movies = utils.exec_get_all(conn, sql)
     print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
-
 
 def topNewReleases(conn):
     userId = utils.sessionToken
@@ -465,56 +493,58 @@ def topNewReleases(conn):
 
 def startMovie(conn):
     userId = utils.sessionToken
-    movieId = input("Enter the ID of your movie: ")
-
-    sql = """SELECT title FROM movie WHERE movie.id = %s"""
-    movie = utils.exec_get_one(conn, sql, (movieId,))
-
-    if movie:
-        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
-        sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
-        utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
-    else:
-        print("You cannot view a movie that does not exist.")
-
+    movieId = getMovieID(conn, "Title of movie to watch ")
+    if movieId == -1:
+        return
+    
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """INSERT INTO userWatchesMovie (movieId, userId, startTime) VALUES (%s, %s, %s)"""
+    utils.exec_commit(conn, sql, (movieId, userId, currentDatetime))
+    print("Started")
 
 def endMovie(conn):
     userId = utils.sessionToken
-    movieId = input("Enter the ID of your movie: ")
-
-    sql = """SELECT startTime FROM userWatchesMovie AS uwm WHERE uwm.userId = %s AND uwm.movieId = %s"""
-    movie = utils.exec_get_one(conn, sql, (userId, movieId))
-
-    if movie:
-        currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
-        sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
-        utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
-    else:
-        print("You have not begun viewing this movie.")
-
-
+    movieId = getMovieID(conn, "Title of movie to end ")
+    if movieId == -1:
+        return
+    currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
+    sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
+    utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
+    print("Ended")
+    
 def rateMovie(conn):
     userId = utils.sessionToken
-    movieId = input("Enter the ID of the movie to rate: ")
-
-    sql = """SELECT title
-            FROM movie AS m
-            WHERE m.id = %s AND m.id IN (SELECT movieid
-                                        FROM userwatchesmovie
-                                        WHERE  userid = %s AND movieid NOT IN (SELECT movieid
-                                                                            FROM userratesmovie
-                                                                            WHERE userid = %s))"""
-    movie = utils.exec_get_one(conn, sql, (movieId, utils.sessionToken, utils.sessionToken))
-
-    if movie:
-        rating = input("Enter a star rating from 1 to 5: ")
-        if int(rating) < 1 or int(rating) > 5:
-            print("Invalid rating.")
+    while(True):
+        movieId = getMovieID(conn, "Title of movie to rate ")
+        if movieId == -1:
+            return
+    
+        sql = """SELECT *
+            FROM userwatchesmovie AS W
+            WHERE W.UserID = %s AND W.MovieID = %s""" 
+        
+        sq2 = """SELECT starrating
+            FROM userratesmovie AS r
+            WHERE r.UserID = %s AND r.MovieID = %s"""
+        
+        check = utils.exec_get_one(conn, sql, (userId, movieId,))
+        if check:
+            check2 = utils.exec_get_one(conn, sq2, (userId, movieId,))
+            if not check2:
+                rating = input("Enter a star rating from 1 to 5: ")
+                try:
+                    if int(rating) in range(1,5):
+                        sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
+                        utils.exec_commit(conn, sql, (movieId, userId, rating))
+                        print("Rated.")
+                    else:
+                        print("Invalid rating.")
+                except Exception:
+                    print("Invalid rating.")
+            else:
+                print("You cannot rate a movie that you have already rated.")
         else:
-            sql = """INSERT INTO userRatesMovie (movieId, userId, starRating) VALUES (%s, %s, %s)"""
-            utils.exec_commit(conn, sql, (movieId, userId, rating))
-    else:
-        print("You cannot rate a movie that does not exist or that you have already rated.")
+            print("You cannot rate a movie that you have not watch.")
 
 def changeCollectionName(conn):
     userId = utils.sessionToken
@@ -533,84 +563,68 @@ def changeCollectionName(conn):
     else:
         print("*** Collection not found or is not yours ***")
     
-    
 def addMovieToCollection(conn):
     userId = utils.sessionToken
-    print("*** Type QUIT to stop ***")
+    userId = utils.sessionToken
+    collectionId = getCollectionID(conn, "Name of collection: ")
+    if collectionId == -1:
+        return  
     while (True):
-        collectionName = input("Name of collection: ")
-        if collectionName.casefold() == "QUIT".casefold():
-            return       
-        collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
-        results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
-        if (results):
-            accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
-            collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
-            if(collectionId):
-                break
-            else:
-                print("*** You Do Not Own That Collection ***")
-        else:
-            print("*** Collection not found ***")
-    while (True):
-        print("*** Type QUIT to stop ***")
-        movieTitle = input("Title of movie: ")
-        if movieTitle.casefold() == "QUIT".casefold():
-            return       
-        movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
-        movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
-        if (movieId):
-            if len(movieId)>1:
-                for i in range(len(movieId)):
-                    movieQuery = "SELECT Title FROM Movie WHERE id = %s"
-                    movie = utils.exec_get_one(conn, movieQuery, (movieId[i],))
-                    dateQuery = "SELECT ReleaseDate FROM MoviePlatform WHERE MovieId = %s"
-                    date = utils.exec_get_one(conn, dateQuery, (movieId[i],))
-                    print(f"{i} {movie[0]} {format(date[0])}")
-                index = -1
-                while(index<0 or index>(len(movieId))):
-                    index = input("Enter the number of the movie you want: ")
-                    try:
-                        index = int(index)
-                    except ValueError:
-                        index = -1
-                        print("*** Invalid number ***")
-            else:
-                index = 0
-            try:
-                insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
-                utils.exec_commit(conn, insert, (movieId[index], collectionId,))
-            except Exception:
-                curs = conn.cursor()
-                curs.execute("ROLLBACK")
-                conn.commit()
-                print("*** Already in collection ***")
-        else:
-            print("*** Movie not found ***")
+        movieId = getMovieID(conn, "Title of movie: ")
+        if movieId == -1:
+            return
+        try:
+            insert = "INSERT INTO MovieCollection (MovieId, CollectionId) VALUES (%s, %s)"
+            utils.exec_commit(conn, insert, (movieId, collectionId,))
+        except Exception:
+            curs = conn.cursor()
+            curs.execute("ROLLBACK")
+            conn.commit()
+            print("*** Already in collection ***")
 
 def removeMovieFromCollection(conn):
     userId = utils.sessionToken
+    collectionId = getCollectionID(conn, "Name of collection: ")
+    if collectionId == -1:
+        return   
+    while (True):
+        movieId = getMovieID(conn, "Title of movie: ")
+        if movieId == -1:
+            return
+        movieCheckQuery = "SELECT MovieId FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+        results = utils.exec_get_one(conn, movieCheckQuery, (movieId, collectionId,))
+        if results:
+            delete = "DELETE FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
+            utils.exec_commit(conn, delete, (movieId, collectionId,))
+            print("*** Deleted ***")
+        else:
+            print("*** Movie not in Collection ***")
+
+def getCollectionID(conn , message):
+    userId = utils.sessionToken
     print("*** Type QUIT to stop ***")
     while (True):
-        collectionName = input("Name of collection: ")
+        collectionName = input(message)
         if collectionName.casefold() == "QUIT".casefold():
-            return       
+            return -1    
         collectionCheckQuery = "SELECT Name FROM UserMovieCollection WHERE name = %s"
         results = utils.exec_get_one(conn, collectionCheckQuery, (collectionName,))
         if (results):
             accesCheckQuery = "SELECT Id FROM UserMovieCollection WHERE UserId = %s and name = %s"
             collectionId = utils.exec_get_one(conn, accesCheckQuery, (userId, collectionName,))
             if(collectionId):
-                break
+                return collectionId
             else:
                 print("*** You Do Not Own That Collection ***")
         else:
             print("*** Collection not found ***")
+
+def getMovieID(conn, message):
+    print("*** Type QUIT to stop ***")
     while (True):
-        print("*** Type QUIT to stop ***")
         movieTitle = input("Title of movie: ")
         if movieTitle.casefold() == "QUIT".casefold():
-            return       
+            return -1    
         movieCheckQuery = "SELECT id FROM Movie WHERE Title = %s"
         movieId = utils.exec_get_all(conn, movieCheckQuery, (movieTitle,))
         if (movieId):
@@ -629,19 +643,12 @@ def removeMovieFromCollection(conn):
                     except ValueError:
                         index = -1
                         print("*** Invalid number ***")
+                return movieId[index]
             else:
-                index = 0
-            movieCheckQuery = "SELECT MovieId FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
-            results = utils.exec_get_one(conn, movieCheckQuery, (movieId[index], collectionId,))
-            if results:
-                delete = "DELETE FROM MovieCollection WHERE MovieId = %s AND CollectionId = %s"
-                utils.exec_commit(conn, delete, (movieId[index], collectionId,))
-                print("*** Deleted ***")
-            else:
-                print("*** Movie not in Collection ***")
-
+                return movieId[0]
         else:
             print("*** Movie not found ***")
+            
 
 def deleteCollection(conn):
     userId = utils.sessionToken
@@ -669,7 +676,6 @@ def deleteCollection(conn):
 
 def quit():
     raise Exception("The QUIT command has no related function, something is wrong")
-
 
 # This must be at the bottom of this file so that the functions are declared before assignment.
 cliCommands = {
@@ -709,10 +715,10 @@ cliCommands = {
         "actionFunction": movieSearch,
         "isDbAccessCommand": True
     },
-    "COLLECTION_COUNT":
+    "MY_INFO":
     {
-        "helpText": "Get the number of collections you own",
-        "actionFunction": collectionCount,
+        "helpText": "Get the number of collections you own, as well as follower and following counts",
+        "actionFunction": userInfo,
         "isDbAccessCommand": True
     },
     "RECOMMENDED_MOVIES":
@@ -736,7 +742,7 @@ cliCommands = {
     "FOLLOWER_FAVORITES":
     {
         "helpText": "See your top 20 favorite movies based on your followers watch history",
-        "actionFunction": getTopTenMoviesAmongFollowers,
+        "actionFunction": getTopTwentyMoviesAmongFollowers,
         "isDbAccessCommand": True
     },
     "VIEW_COLLECTION" :
@@ -849,7 +855,18 @@ def passwordHelp():
     print("contain no spaces")
     print("*******************************************************")
 
+# Return the hashed password and the salt
+def saltAndHash(password):
+    # Generates a random string of ascii letters of size 32 
+    saltSize = 32
+    salt = ''.join(random.choices(string.ascii_letters, k=saltSize))
 
-def salt():
-    # TODO dont forget to add salt to users table
-    print("SALT IS NOT IMPLEMENTED YET")
+    # Password is affixed with the first and second half of salt
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+
+    return (hashedPassword, salt)
+
+# Get the expected password when we know the salt (for login)
+def getHash(password, salt):
+    hashedPassword = sha256((salt[:16] + password + salt[16:]).encode('utf-8')).hexdigest()
+    return hashedPassword
