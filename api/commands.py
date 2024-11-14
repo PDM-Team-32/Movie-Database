@@ -98,7 +98,6 @@ def login(conn):
     print("Welcome back " + username)
     utils.sessionToken = int(id) # TODO change to DB sessionToken 
         
-# TODO this needs to become a connected function to store sessionToken in DB
 def logout():
     if (utils.sessionToken > 0):
         utils.sessionToken = -1
@@ -107,7 +106,7 @@ def logout():
         print("*** You need to LOGIN before you can LOGOUT ***")
 
 # Idea here is a user will search for another user, and take respective following action
-# We can also see others collections here, if we want to
+# Display the users following counts
 def userSearch(conn):
     searchedEmail = input("\tPlease input an email to search: ")
 
@@ -124,7 +123,7 @@ def userSearch(conn):
         # search for the userID and determine following state
         followingQuery = """SELECT followeduserid FROM userfollowinguser WHERE
                             followinguserid = %s and followeduserid = %s"""
-        followingId = utils.exec_get_all(conn, followingQuery, (utils.sessionToken, searchedUserId))
+        followingId = utils.exec_get_one(conn, followingQuery, (utils.sessionToken, searchedUserId))
         if (followingId):
             followingString = "following"
             actionString = "unfollow"
@@ -132,6 +131,22 @@ def userSearch(conn):
             followingString = "not following"
             actionString = "follow"
         print("\tYou are " + followingString + " " + searchedEmail)
+
+        # Get the following/follower count
+        followingCountSql = """
+                        SELECT COUNT(followinguserid)
+                        FROM userfollowinguser
+                        WHERE followinguserid = %s"""
+        
+        followersCountSql = """
+                        SELECT COUNT(followeduserid)
+                        FROM userfollowinguser
+                        WHERE followeduserid = %s"""
+                
+        followingCount = str(utils.exec_get_one(conn, followingCountSql, (searchedUserId,))[0])
+        followedCount = str(utils.exec_get_one(conn, followersCountSql, (searchedUserId,))[0])
+
+        print("\tThey are following " + followingCount + " accounts and are followed by " + followedCount + " accounts.")
 
         # get a valid input
         while (True):
