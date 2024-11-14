@@ -400,12 +400,11 @@ def endMovie(conn):
     movieId = getMovieID(conn, "Title of movie to end ")
     if movieId == -1:
         return
-
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
     sql = """UPDATE userWatchesMovie AS uwm SET endTime = %s WHERE uwm.movieId = %s AND uwm.userId = %s"""
     utils.exec_commit(conn, sql, (currentDatetime, movieId, userId))
     print("Ended")
-
+    
 def rateMovie(conn):
     userId = utils.sessionToken
     while(True):
