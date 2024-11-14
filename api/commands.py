@@ -6,26 +6,47 @@ import random
 import string
 from hashlib import sha256
 
-# TODO char limits on everything
-# TODO attempt limit on while true loops
 def createAccount(conn):
     print("Account Creation:")
+    attempts = 0
 
     # Get an unused username 
-    while (True):
+    while (True and attempts < 20):
         username = input("\tProvide a Username: ")
-        userCheckQuery = "SELECT username FROM users WHERE username = %s"
-        results = utils.exec_get_one(conn, userCheckQuery, (username,))
-        if (results):
-            print("*** That username is taken! ***")
+        if (len(username) > 32):
+            print("*** That username is too long (> 32 chars) ***")
         else:
-            break
+            userCheckSql = "SELECT username FROM users WHERE username = %s"
+            results = utils.exec_get_one(conn, userCheckSql, (username,))
+            if (results):
+                print("*** That username is taken! ***")
+            else:
+                break
+        attempts += 1
+
+    if (attempts == 20):
+        print("Too many attempts, try again later")
+        return
+    else:
+        attempts = 0
     
     # Get an email address 
-    email = input("\tProvide an email address: ")
-    while (not re.match(r"^\S+@\S+\.\S+$", email)):
-        print("***" + email + " is not a valid email address ***")
-        email = input("\tProvide a valid email address: ")
+    while (True and attempts < 320):
+        email = input("\tProvide an email address: ")
+        if (len(email) > 64):
+            print("*** That email is too long (> 64 chars) ***")
+        else:
+            if (not bool(re.match(r"^\S+@\S+\.\S+$", email))):
+                print("***" + email + " is not a valid email address ***")
+            else:
+                break
+        attempts += 1
+
+    if (attempts == 20):
+        print("Too many attempts, try again later")
+        return
+    else:
+        attempts = 0
     
     # Get a valid password (see regex or passwordHelp)
     passwordHelp()
@@ -35,10 +56,18 @@ def createAccount(conn):
            bool(re.search("[a-z]", password)) and
            bool(re.search("[A-Z]", password)) and
            bool(re.search(r"[!@#\$%\^&\*\(\)_\+\-\=\[\]\'\\\|,\.<>\?/]", password)) and
-           bool((not re.search(" ", password))))):
+           bool((not re.search(" ", password)))) and 
+           attempts < 20):
         print("*** That was not a valid password ***")
         passwordHelp()
         password = str(input("\tProvide a Password: "))
+        attempts += 1
+
+    if (attempts == 20):
+        print("Too many attempts, try again later")
+        return
+    else:
+        attempts = 0
     
     # Valid password, lets salt and hash
     hashResults = saltAndHash(password)
@@ -46,8 +75,21 @@ def createAccount(conn):
     salt = hashResults[1]
 
     # Get remaining info (we don't really care abt this about validating these)
-    fName = input("\tProvide a First Name: ")
-    lName = input("\tProvide a Last Name: ")
+    while (True and attempts < 20):
+        fName = input("\tProvide a First Name: ")
+        if (len(fName) > 32):
+            print("\t*** Please shorten your first name (< 32 chars) ***")
+        else:
+            break
+        attempts += 1
+    while (True and attempts < 20):
+        lName = input("\tProvide a Last Name: ")
+        if (len(lName) > 32):
+            print("\t*** Please shorten your last name (< 32 chars) ***")
+        else:
+            break
+        attempts += 1
+    
     currentDatetime = "'" + datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "'"
 
     # Insert the user into the DB 
@@ -58,6 +100,7 @@ def createAccount(conn):
     print("Welcome to MovieDB, please use the LOGIN command to access your account")
 
 def login(conn):
+    attempts = 0
     idPasswordQuery = "SELECT id, password, salt FROM users where username = %s"
     id = ""
     expectedPassword = ""
@@ -65,7 +108,7 @@ def login(conn):
     print("*** Note: To login, you must first create an account ***\n*** To exit the login command, enter 'exit' ***")
 
     # Ensure the account exists
-    while (True):
+    while (True and attempts < 20):
         username = input("\tEnter your username: ")
         if (username.lower() == "exit"):
             return
@@ -81,13 +124,27 @@ def login(conn):
             break
         else:
             print("*** Not an existing username ***\n*** Note: To login, you must first create an account ***")
+        attempts += 1
+
+    if (attempts == 20):
+        print("Too many attempts, try again later")
+        return
+    else:
+        attempts = 0
     
     hashedPassword = ""
-    while (not (hashedPassword == expectedPassword)):
+    while (not (hashedPassword == expectedPassword) and attempts < 20):
         password = input("\t(" + username + ") Enter your password: ")
         if (password.lower() == "exit"): # note: exit is not a valid password (see createAccount())
             return
         hashedPassword = getHash(password.strip(), salt)
+        attempts += 1
+
+    if (attempts == 20):
+        print("Too many attempts, try again later")
+        return
+    else:
+        attempts = 0
     
     # Update lastaccessdate 
     datePrompt = "UPDATE users SET lastaccessdate = %s WHERE id = %s"
@@ -96,7 +153,7 @@ def login(conn):
     
     # User is now logged in
     print("Welcome back " + username)
-    utils.sessionToken = int(id) # TODO change to DB sessionToken 
+    utils.sessionToken = int(id)
         
 def logout():
     if (utils.sessionToken > 0):
