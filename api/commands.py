@@ -3,13 +3,6 @@ import utils
 from tabulate import tabulate
 import datetime
 import re
-import numpy as np
-import matplotlib.pyplot as plt
-import sklearn as sk
-import seaborn as seaborn
-
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
 
 # TODO char limits on everything
 # TODO attempt limit on while true loops
@@ -325,84 +318,45 @@ def formatArrayToTallString(array):
         outString += x + "\n"
     return outString
 
-def recommendByML(conn):
+def recommendBySimilarUsers(conn):
     userId = utils.sessionToken
-    linReg = createLinearRegression(conn, userId)
     
     # This will get a list of movies from "similar users" meaning they rated movies similarly in the past
     sql = """
-            SELECT
-                m.title,
-                mp.platformid AS platform,
-                (SELECT mg.genreid
-                        FROM moviegenre AS mg
-                        WHERE(m.id = mg.movieid) LIMIT 1) AS genres,
-                (SELECT cd.castId
-                        FROM castdirects AS cd
-                        WHERE(cd.movieid = m.id) LIMIT 1) AS directors
+            SELECT DISTINCT (m.title)
+            FROM(SELECT
+                m.id
                 FROM movie AS m
                 INNER JOIN userRatesMovie AS urm
                     ON(urm.movieid = m.id)
-                INNER JOIN movieplatform AS mp
-                    ON(mp.movieid = m.id)
                 WHERE  urm.userId IN (SELECT
                                         urm.userid
                                     FROM userratesmovie AS urm_base
                                     INNER JOIN userRatesMovie AS urm
                                         ON(urm.movieid = urm_base.movieid)
-                                    WHERE (urm.userid != %(inUserId)s AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = %(inUserId)s))
-                ORDER BY urm.starrating DESC;
-                """
-    similarUserWatchHistory = pandas.read_sql_query(sql, conn, params={"inUserId": userId})
-    titleless = similarUserWatchHistory.drop(['title'], axis=1)
-    titles_only = similarUserWatchHistory['title']
-
-    predictions = linReg.predict(titleless)
-
-    predictions, titles_only = zip(*sorted(zip(predictions, titles_only)))
-    predictions = list(predictions)[::-1]
-    reversed = list(titles_only)[::-1]
-
-    filtered = []
-    x = 5
-    counter = 0
-    while x > 3.5 and counter < len(predictions):
-        x = predictions[counter]
-        filtered.append([reversed[counter]])
-        counter += 1
-    print(tabulate(filtered, headers=["Title"], tablefmt='grid'))
-
-
-def createLinearRegression(conn, userId):
-# This query is gross and I hate it. The LIMIT 1s are bc sklearn cant take an array
-    sql = """
-            SELECT
-            urm.starrating,
-            mp.platformid AS platform,
-            (SELECT mg.genreid
-                    FROM moviegenre AS mg
-                    WHERE(m.id = mg.movieid) LIMIT 1) AS genres,
-            (SELECT cd.castId
-                    FROM castdirects AS cd
-                    WHERE(cd.movieid = m.id) LIMIT 1) AS directors
-            FROM movie AS m
-            INNER JOIN userRatesMovie AS urm
-                ON(urm.movieid = m.id)
-            INNER JOIN movieplatform AS mp
-                ON(mp.movieid = m.id)
-            WHERE  urm.userId = %(inUserId)s
-            ORDER BY urm.starrating DESC
-            LIMIT 300;
+                                    WHERE (urm.userid != 1 AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = 1 AND urm.starrating > 3))
+                ORDER BY urm.starrating DESC) AS similarUsers
+            INNER JOIN movie AS m
+                ON (m.id = similarUsers.id)
+            INNER JOIN moviegenre AS mg
+                ON (mg.movieid = m.id)
+            INNER JOIN castdirects AS cd
+                ON (cd.movieid = m.id)
+            WHERE (mg.genreid IN (SELECT DISTINCT(mg.genreId)
+                                FROM moviegenre AS mg
+                                        INNER JOIN userwatchesmovie AS urm
+                                                    ON urm.movieid = mg.movieid
+                                WHERE (urm.userid = 1 AND urm.starttime > CURRENT_DATE - INTERVAL '90' day))
+                AND cd.castid IN (SELECT DISTINCT(cd.castid)
+                                FROM castdirects AS cd
+                                        INNER JOIN userwatchesmovie AS urm
+                                                    ON urm.movieid = mg.movieid
+                                WHERE (urm.userid = 1 and urm.starttime > CURRENT_DATE - INTERVAL '90' day))
+                    )
         """
-    userWatchHistory = pandas.read_sql_query(sql, conn, params={"inUserId":userId})
+    movies = list(utils.exec_get_all(conn, sql, (userId, userId)))
+    print(tabulate(movies, headers=["Title"], tablefmt='orgtbl'))
 
-    x = userWatchHistory.drop(['starrating'], axis=1)
-    y = userWatchHistory['starrating']
-    # Assign test and training data
-    x_train, x_test, y_train, y_test = train_test_split(x, y, train_size = 0.99, random_state = 123)
-    LR = LinearRegression()
-    LR.fit(x_train, y_train)
-    return LR
 
 def collectionCount(conn):
     userId = utils.sessionToken
@@ -792,10 +746,10 @@ cliCommands = {
         "actionFunction": viewCollections,
         "isDbAccessCommand": True
     },
-    "RECOMMEND_MOVIE_WITH_ML" :
+    "RECOMMEND_BY_SIMILAR_USERS" :
     {
-        "helpText": "Use our ML model to recommend you movies based on your historic watch data",
-        "actionFunction": recommendByML,
+        "helpText": "Find recommended movies based on what similar users have enjoyed",
+        "actionFunction": recommendBySimilarUsers,
         "isDbAccessCommand": True
     },
     "START_MOVIE" :
