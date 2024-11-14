@@ -2,11 +2,12 @@ CREATE TABLE Users(
     id SERIAL PRIMARY KEY,
     FirstName VARCHAR(32) NOT NULL,
     LastName VARCHAR(32) NOT NULL,
-    Email VARCHAR(320) NOT NULL,
+    Email VARCHAR(320) NOT NULL UNIQUE,
     UserName VARCHAR(32) NOT NULL UNIQUE,
     Password VARCHAR(64) NOT NULL,
     CreationDate DATE NOT NULL,
-    LastAccessDate DATE NOT NULL
+    LastAccessDate DATE NOT NULL,
+    Salt VARCHAR(32)
 );
 
 CREATE TABLE Studio(
