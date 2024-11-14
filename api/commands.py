@@ -176,6 +176,7 @@ def help():
     for key in cliCommands:
         print(key + ": " + cliCommands[key]["helpText"])
 
+
 def movieSearch(conn):
     searchArray = []
     sortByArray = []
@@ -262,6 +263,7 @@ def movieSearch(conn):
     else:
         print("No results found")
 
+
 def getMovieUserRating(conn, movieId):
     sql = """
     SELECT AVG(urm.starrating)::int
@@ -273,6 +275,7 @@ def getMovieUserRating(conn, movieId):
     if output == None:
         output = "No ratings"
     return output
+
 
 def makeOrderByString(array):
     if array[0] in orderByCommands["Selection"].keys():
@@ -286,6 +289,7 @@ def makeOrderByString(array):
         print("Invalid sort selection will default to movie name")
         qualifier = orderByCommands["Selection"]["A"]
     return(selection + " " + qualifier)
+
 
 def watchCollection(conn):
     collectionName = (input("Give the name of the collection you want to watch: "))
@@ -310,6 +314,7 @@ def watchCollection(conn):
         utils.exec_commit(conn, sql, (movie[2], utils.sessionToken, startTime, endTime))
         startTime = endTime
 
+
 def formatMovieSearchOutput(conn, input):
     output = list(input)
     for x in range(0, len(output)):
@@ -328,6 +333,47 @@ def formatArrayToTallString(array):
     for x in array:
         outString += x + "\n"
     return outString
+
+
+def recommendBySimilarUsers(conn):
+    userId = utils.sessionToken
+    
+    # This will get a list of movies from "similar users" meaning they rated movies similarly in the past
+    sql = """
+            SELECT DISTINCT (m.title)
+            FROM(SELECT
+                m.id
+                FROM movie AS m
+                INNER JOIN userRatesMovie AS urm
+                    ON(urm.movieid = m.id)
+                WHERE  urm.userId IN (SELECT
+                                        urm.userid
+                                    FROM userratesmovie AS urm_base
+                                    INNER JOIN userRatesMovie AS urm
+                                        ON(urm.movieid = urm_base.movieid)
+                                    WHERE (urm.userid != 1 AND urm.starrating BETWEEN urm_base.starrating- 1 AND urm_base.starrating-1 AND urm_base.userid = 1 AND urm.starrating > 3))
+                ORDER BY urm.starrating DESC) AS similarUsers
+            INNER JOIN movie AS m
+                ON (m.id = similarUsers.id)
+            INNER JOIN moviegenre AS mg
+                ON (mg.movieid = m.id)
+            INNER JOIN castdirects AS cd
+                ON (cd.movieid = m.id)
+            WHERE (mg.genreid IN (SELECT DISTINCT(mg.genreId)
+                                FROM moviegenre AS mg
+                                        INNER JOIN userwatchesmovie AS urm
+                                                    ON urm.movieid = mg.movieid
+                                WHERE (urm.userid = 1 AND urm.starttime > CURRENT_DATE - INTERVAL '90' day))
+                AND cd.castid IN (SELECT DISTINCT(cd.castid)
+                                FROM castdirects AS cd
+                                        INNER JOIN userwatchesmovie AS urm
+                                                    ON urm.movieid = mg.movieid
+                                WHERE (urm.userid = 1 and urm.starttime > CURRENT_DATE - INTERVAL '90' day))
+                    )
+        """
+    movies = list(utils.exec_get_all(conn, sql, (userId, userId)))
+    print(tabulate(movies, headers=["Title"], tablefmt='orgtbl'))
+
 
 def userInfo(conn):
     userId = utils.sessionToken
@@ -371,6 +417,7 @@ def viewCollections(conn):
         if movies[x][2] == None:
             movies[x] = [movies[x][0], movies[x][1], "00:00"]
     print(tabulate(movies, headers=["Name", "Movie Count", "Collection Length"], tablefmt='orgtbl'))
+
 
 def createMovieCollection(conn):
     userId = utils.sessionToken
@@ -424,7 +471,7 @@ def recommendedMovies(conn):
             GROUP BY m.title
             ORDER BY views DESC
             LIMIT 20;"""
-    movies = utils.exec_get_all(conn, sql, (userId,))
+    movies = utils.exec_get_all(conn, sql)
     print(tabulate(movies, headers=["Title", "Views"], tablefmt='orgtbl'))
 
 def topNewReleases(conn):
@@ -702,6 +749,12 @@ cliCommands = {
     {
         "helpText": "Look at your collections and see their stats",
         "actionFunction": viewCollections,
+        "isDbAccessCommand": True
+    },
+    "RECOMMEND_BY_SIMILAR_USERS" :
+    {
+        "helpText": "Find recommended movies based on what similar users have enjoyed",
+        "actionFunction": recommendBySimilarUsers,
         "isDbAccessCommand": True
     },
     "START_MOVIE" :
